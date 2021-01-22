@@ -64,6 +64,21 @@
         "type": "png"
       },
       {
+        "file": "images/icon_auto_on.png",
+        "name": "IMAGE_ICON_AUTO_ON",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_auto_off.png",
+        "name": "IMAGE_ICON_AUTO_OFF",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_unavailable.png",
+        "name": "IMAGE_ICON_UNAVAILABLE",
+        "type": "png"
+      },
+      {
         "file": "images/icon_unknown.png",
         "name": "IMAGE_ICON_UNKNOWN",
         "type": "png"
@@ -73,6 +88,7 @@
   "sdkVersion": "3",
   "shortName": "Hass.io",
   "targetPlatforms": [
+    "aplite",
     "basalt"
   ],
   "uuid": "e72aed38-ceda-412b-bb20-3f606494cd1a",
