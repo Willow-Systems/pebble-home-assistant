@@ -67,11 +67,11 @@ function getEntityClass(entity_id) {
 	homeMenu.show();
 	homeMenu.on('select', function(e) {
 		if (e.item.title.toLowerCase() == "lights") {
-			hass.getStates(renderStatesMenu, ["light"]);
+			hass.getStates(renderStatesMenu, "light");
 		} else if (e.item.title.toLowerCase() == "switches") {
-			hass.getStates(renderStatesMenu, ["switch"]);
+			hass.getStates(renderStatesMenu, "switch");
 		} else if (e.item.title.toLowerCase() == "sensors") {
-			hass.getStates(renderStatesMenu, ["sensor"]);
+			hass.getStates(renderStatesMenu, "sensor");
 		}
 	});
 
@@ -213,7 +213,7 @@ function renderStatesMenu(data, filter) {
 					// && entity.entity_id == menuPosToID[e.itemIndex]
 					// console.log("Does " + entity.entity_id + " match " + menuPosToID[e.itemIndex].entity_id)
 					data = entity;
-					//break;
+					break;
 				}
 			}
 
@@ -236,6 +236,7 @@ function renderStatesMenu(data, filter) {
 				if (entity.state == "off") { icon = "IMAGE_ICON_SWITCH_OFF" }
 			}
 
+				mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: subtitle, icon: icon });
 
 			}, e.itemIndex)
 

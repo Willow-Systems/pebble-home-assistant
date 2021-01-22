@@ -30,14 +30,22 @@ function makeGetRequest(path, cb, cbo) {
   }
   ajax({url: _url() + "/api" + path, type: 'json', headers: headers}, function(data) {
     cb(data, cbo)
-  });
+  }, genericNetworkFail);
 }
 function makePostRequest(path, data, cb) {
   var headers = {
     "Authorization": "Bearer " + env.token
   }
   console.log("[hass] Posting '" + JSON.stringify(data) + "' to " + path)
-  ajax({url: _url() + "/api" + path, type: 'json', headers: headers, data: data, method: "post"}, cb);
+  ajax({url: _url() + "/api" + path, type: 'json', headers: headers, data: data, method: "post"}, cb, genericNetworkFail);
+}
+function genericNetworkFail() {
+  var card = new UI.Card({
+    title: 'Uh Oh',
+    body: 'Failed to talk to Home Assistant',
+    style: "small",
+    scrollable: false
+  });
 }
 
 function getStates(cb, filter) {
