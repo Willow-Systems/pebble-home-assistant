@@ -11,18 +11,18 @@ There are only two 'Home Assistant' apps on the [Rebble app store](https://apps.
 ## To Do List:
 
 - Lights:
-  - [ ] List lights and toggle their on/off states
+  - [X] List lights and toggle their on/off states
   - [ ] Long-press to view more information
   - [ ] Change brightness
   - [ ] Set bulb colour
 - Switches:
-  - [ ] List switches in home assistant
-  - [ ] Turn switches on / off
+  - [X] List switches in home assistant
+  - [X] Turn switches on / off
 - Sensors:
-  - [ ] List sensors from Home assistant
+  - [X] List sensors from Home assistant
   - [ ] Support standard/popular sensor attributes
 - Automations:
-  - [ ] List automations in home assistant
+  - [X] List automations in home assistant
   - [ ] Enable / disable automations
   - [ ] Force execute Automations
 - General App stuff:
