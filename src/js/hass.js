@@ -45,6 +45,7 @@ function getStates(cb, filter) {
   makeGetRequest("/states", cb, filter)
 }
 
+
 function toggle(entity, cb) {
 
   console.log("[hass] Toggle device " + entity.entity_id)
@@ -66,6 +67,15 @@ function toggle(entity, cb) {
   makePostRequest(path, data, cb)
 
 }
+function refresh(entity, cb) {
+
+  console.log("[hass] Refresh entity " + entity.entity_id);
+  var path = "/states/" + entity.entity_id;
+
+  makeGetRequest(path, cb)
+
+}
 
 module.exports.getStates = getStates;
 module.exports.toggle = toggle;
+module.exports.refresh = refresh;

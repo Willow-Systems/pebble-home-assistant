@@ -202,10 +202,12 @@ function renderStatesMenu(data, filter) {
 		console.log('Resolved to entity ID ' + menuPosToID[e.itemIndex].entity_id);
 		mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: '...' });
 
-		hass.toggle(menuPosToID[e.itemIndex], function(data, itemIndex) {
+		if (["light","switch"].indexOf(filter) != -1) {
 
-			console.log("Got this back: " + JSON.stringify(data))
-			for (var i = 0; i < data.length; i++) {
+			hass.toggle(menuPosToID[e.itemIndex], function(data, itemIndex) {
+
+				console.log("Got this back: " + JSON.stringify(data))
+				for (var i = 0; i < data.length; i++) {
 				var entity = data[i];
 				if (getEntityClass(entity.entity_id) != "group" && entity.entity_id == menuPosToID[e.itemIndex].entity_id) {
 					// && entity.entity_id == menuPosToID[e.itemIndex]
@@ -216,26 +218,66 @@ function renderStatesMenu(data, filter) {
 			}
 
 
-			var subtitle = data.state
-			var icon = e.item.icon
-			console.log("---------------------")
-			console.log(data)
-			if (entity.state == "on" && data.attributes.hasOwnProperty("brightness")) {
+				var subtitle = data.state
+				var icon = e.item.icon
+				console.log("---------------------")
+				console.log(data)
+				if (entity.state == "on" && data.attributes.hasOwnProperty("brightness")) {
 				var bri = parseInt(data.attributes.brightness);
 				bri = bri / 255 * 100;
 				subtitle += " (" + Math.floor(bri) + "%)"
 			}
-			if (getEntityClass(entity.entity_id) == "light") {
+				if (getEntityClass(entity.entity_id) == "light") {
 				if (entity.state == "on") { icon = "IMAGE_ICON_BULB_ON" }
 				if (entity.state == "off") { icon = "IMAGE_ICON_BULB" }
 			}
-			if (getEntityClass(entity.entity_id) == "switch") {
+				if (getEntityClass(entity.entity_id) == "switch") {
 				if (entity.state == "on") { icon = "IMAGE_ICON_SWITCH_ON" }
 				if (entity.state == "off") { icon = "IMAGE_ICON_SWITCH_OFF" }
 			}
-			mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: subtitle, icon: icon });
 
-		}, e.itemIndex)
+
+			}, e.itemIndex)
+
+		} else if (filter == "sensor") {
+
+			hass.refresh(menuPosToID[e.itemIndex], function(data, itemIndex) {
+
+				console.log("Got this back: " + JSON.stringify(data))
+
+				//This code repeats and that's terrible. I should feel bad. Need to fix this later
+				var icon = "IMAGE_ICON_SENSOR"
+				var subtitle = data.state
+				if (data.attributes.hasOwnProperty("device_class") && data.attributes.device_class == "temperature") {
+					icon = "IMAGE_ICON_TEMP"
+				}
+				if (data.attributes.hasOwnProperty("unit_of_measurement")) {
+					subtitle += " " + data.attributes.unit_of_measurement
+				}
+				if (data.attributes.hasOwnProperty("device_class")) {
+					if (data.attributes.device_class == "opening") {
+						subtitle = {
+							"on": "Open",
+							"off": "Closed"
+						}[data.state]
+						icon = {
+							"on": "IMAGE_ICON_DOOR_OPEN",
+							"off": "IMAGE_ICON_DOOR_CLOSED"
+						}[data.state]
+					}
+				}
+
+				var title = data.attributes.friendly_name
+
+				if (sensorConfig.invertSubtitle) {
+					title = subtitle
+					subtitle = data.attributes.friendly_name
+				}
+
+				mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: subtitle, icon: icon });
+
+			}, e.itemIndex)
+		}
 
 	});
 
