@@ -1,4 +1,5 @@
 var ajax = require('ajax');
+var UI = require('ui');
 var tempAuth = require("./hackyTempAuth");
 
 var env = {
@@ -40,12 +41,13 @@ function makePostRequest(path, data, cb) {
   ajax({url: _url() + "/api" + path, type: 'json', headers: headers, data: data, method: "post"}, cb, genericNetworkFail);
 }
 function genericNetworkFail() {
-  var card = new UI.Card({
+  var ohno = new UI.Card({
     title: 'Uh Oh',
     body: 'Failed to talk to Home Assistant',
     style: "small",
     scrollable: false
   });
+  ohno.show();
 }
 
 function getStates(cb, filter) {

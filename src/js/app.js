@@ -2,8 +2,8 @@ var UI = require('ui');
 var ajax = require('ajax');
 var Wakeup = require('wakeup');
 var Settings = require('settings');
-var Vector2 = require('vector2');
 var Feature = require('platform/feature');
+var Platform = require('platform');
 var hass = require('./hass.js');
 
 var entityTypeWhitelist = ["light"];
@@ -13,6 +13,14 @@ var entityBlacklist = [
 	"switch.boathouse_lamp",
 	"light.bedroom_2"
 ];
+
+var config = {
+	showLights: true,
+	showSwitches: true,
+	showSensors: true,
+	showAutomations: false,
+	enableIcons: true
+}
 
 var sensorConfig = {
 	blacklist: [],
@@ -32,8 +40,9 @@ var sensorConfig = {
 }
 
 var colour = {
-	highlight: "#00AAFF"
+	highlight: Feature.color("#00AAFF","#AAAAAA")
 }
+
 
 mainMenu = new UI.Menu({
 	backgroundColor: 'white',
@@ -57,12 +66,19 @@ function getEntityClass(entity_id) {
 //Pebble.addEventListener('ready', function() {
 	console.log("Lets Go!");
 
+	if (Platform.version() == "aplite") {
+		console.log("Platform is aplite and icons make it sad. Disabling")
+		config.enableIcons = false;
+	}
+
+	var homeItems = [];
+	if (config.showLights) { homeItems.push({ title: "Lights" }) }
+	if (config.showSwitches) { homeItems.push({ title: "Switches" }) }
+	if (config.showSensors) { homeItems.push({ title: "Sensors" }) }
+	if (config.showAutomations) { homeItems.push({ title: "Automations" }) }
+
 	homeMenu.section(0, {
-		items: [
-			{ title: "Lights" },
-			{	title: "Switches"},
-			{	title: "Sensors"}
-		]
+		items: homeItems
 	});
 	homeMenu.show();
 	homeMenu.on('select', function(e) {
@@ -72,6 +88,8 @@ function getEntityClass(entity_id) {
 			hass.getStates(renderStatesMenu, "switch");
 		} else if (e.item.title.toLowerCase() == "sensors") {
 			hass.getStates(renderStatesMenu, "sensor");
+		} else if (e.item.title.toLowerCase() == "automations") {
+			hass.getStates(renderStatesMenu, "automation");
 		}
 	});
 
@@ -111,6 +129,7 @@ function renderStatesMenu(data, filter) {
 
 			var icon = "IMAGE_ICON_UNKNOWN";
 			var subtitle = entity.state;
+			var title = entity.attributes.friendly_name
 
 			if (entity.type == "light") {
 
@@ -156,16 +175,29 @@ function renderStatesMenu(data, filter) {
 
 						icon = {
 							"on": "IMAGE_ICON_DOOR_OPEN",
-							"off": "IMAGE_ICON_DOOR_CLOSED"
+							"off": "IMAGE_ICON_DOOR_CLOSED",
+							"unavailable": "IMAGE_ICON_UNAVAILABLE"
 						}[entity.state]
 					}
 				}
+
+			} else if (entity.type == "automation") {
+
+				subtitle = ""
+				if (title.length > 11) {
+					title = entity.attributes.friendly_name.substr(0, 11)
+					subtitle = entity.attributes.friendly_name.substr(11)
+				}
+				icon = {
+					"on": "IMAGE_ICON_AUTO_ON",
+					"off": "IMAGE_ICON_AUTO_OFF",
+					"unavailable": "IMAGE_ICON_UNAVAILABLE"
+				}[entity.state]
 
 			} else {
 				console.log(JSON.stringify(entity))
 			}
 
-			var title = entity.attributes.friendly_name
 
 			if (filter == "sensor" && sensorConfig.invertSubtitle) {
 				title = subtitle
@@ -174,11 +206,13 @@ function renderStatesMenu(data, filter) {
 
 			console.log("Add entity '" + entity.attributes.friendly_name + "' to list")
 			menuPosToID.push(entity);
-			menuItemArray.push({
+
+			var o = {
 				title: title,
 				subtitle: subtitle,
-				icon: icon
-			});
+			}
+			if (config.enableIcons) {	o.icon = icon	}
+			menuItemArray.push(o);
 
 		}
 
@@ -236,7 +270,9 @@ function renderStatesMenu(data, filter) {
 				if (entity.state == "off") { icon = "IMAGE_ICON_SWITCH_OFF" }
 			}
 
-				mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: subtitle, icon: icon });
+				var o = { title: e.item.title, subtitle: subtitle }
+				if (config.enableIcons) {	o.icon = icon	}
+				mainMenu.item(0, e.itemIndex, o);
 
 			}, e.itemIndex)
 
@@ -275,7 +311,9 @@ function renderStatesMenu(data, filter) {
 					subtitle = data.attributes.friendly_name
 				}
 
-				mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: subtitle, icon: icon });
+				var o = { title: e.item.title, subtitle: subtitle }
+				if (config.enableIcons) {	o.icon = icon	}
+				mainMenu.item(0, e.itemIndex, o);
 
 			}, e.itemIndex)
 		}
