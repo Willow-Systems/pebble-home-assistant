@@ -1,0 +1,84 @@
+{
+  "appKeys": {},
+  "capabilities": [
+    "configurable"
+  ],
+  "companyName": "Willow Systems",
+  "longName": "Home Assistant",
+  "resources": {
+    "media": [
+      {
+        "file": "images/appicon.png",
+        "menuIcon": true,
+        "name": "IMAGE_ICON",
+        "type": "png"
+      },
+      {
+        "file": "fonts/UbuntuMono-Regular.ttf",
+        "name": "MONO_FONT_14",
+        "type": "font"
+      },
+      {
+        "file": "images/tile_splash.png",
+        "name": "IMAGE_TILE_SPLASH",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_bulb.png",
+        "name": "IMAGE_ICON_BULB",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_bulb_on.png",
+        "name": "IMAGE_ICON_BULB_ON",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_sensor.png",
+        "name": "IMAGE_ICON_SENSOR",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_switch_on.png",
+        "name": "IMAGE_ICON_SWITCH_ON",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_switch_off.png",
+        "name": "IMAGE_ICON_SWITCH_OFF",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_temp.png",
+        "name": "IMAGE_ICON_TEMP",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_door_open.png",
+        "name": "IMAGE_ICON_DOOR_OPEN",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_door_closed.png",
+        "name": "IMAGE_ICON_DOOR_CLOSED",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_unknown.png",
+        "name": "IMAGE_ICON_UNKNOWN",
+        "type": "png"
+      }
+    ]
+  },
+  "sdkVersion": "3",
+  "shortName": "Hass.io",
+  "targetPlatforms": [
+    "basalt"
+  ],
+  "uuid": "e72aed38-ceda-412b-bb20-3f606494cd1a",
+  "versionCode": 1,
+  "versionLabel": "1.0",
+  "watchapp": {
+    "watchface": false
+  }
+}

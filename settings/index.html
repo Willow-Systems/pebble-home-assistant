@@ -1,0 +1,129 @@
+<html>
+<head>
+  <link rel="stylesheet" type="text/css" href="main.css"></link>
+  <script src="jquery.min.js"></script>
+</head>
+<body>
+    <div class="titlebar">
+      <center>
+        <table><tr><td>
+          <img src="img/titleicon.svg" class="titleimage"></img>
+        </td><td>
+          <h1 class="title"> Rain Alert </h1>
+        <td></tr></table>
+      </center>
+    </div>
+    <!-- <h5 class="subtitle"> Settings </h5> -->
+  </center>
+  <br>
+  <div class="container">
+
+    <div class="setting">
+       DarkSky API Key:
+      <input name="apikey" id="apikey" class="niceinput"></input>
+    </div>
+
+    <div class="bgmsg">
+      If you do not have a darkSky API Key, you can generate one for free at DarkSky.net
+    </div>
+
+    <br>
+
+    <div class="setting">
+       Use fixed location:
+       <label class="switch right">
+         <input type="checkbox" id="forceLoc">
+         <span class="slider"></span>
+       </label>
+       <div id="fixCoords" hidden>
+         <br><br>
+         Fixed Latitude:
+         <input name="apikey" id="apikey" class="niceinput" placeholder="52.9162"></input>
+         <br><br>
+         Fixed Longitude:
+         <input name="apikey" id="apikey" class="niceinput" placeholder="-3.9276"></input>
+       </div>
+     </div>
+
+     <div class="bgmsg">
+       If set to false, GPS will determine location
+     </div>
+
+     <br>
+
+     <div class="setting">
+       Sync Interval:
+       <br><br>
+       <div class="buttons">
+         <button id="int0" class="btn btn-s" onclick="setSyncInterval(this,0)">1h</button>
+         <button id="int1" class="btn btn-s" onclick="setSyncInterval(this,1)">3h</button>
+         <button id="int2" class="btn btn-s" onclick="setSyncInterval(this,2)">8h</button>
+         <button id="int3" class="btn btn-s" onclick="setSyncInterval(this,3)">12h</button>
+         <button id="int4" class="btn btn-s" onclick="setSyncInterval(this,4)">24h</button>
+        </div>
+     </div>
+
+     <br>
+
+     <div class="setting">
+       <button id="save" class="btn btn-l" onclick="saveOptions()">Save</button>
+     </div>
+
+     <div class="footer">
+       Willow Systems
+     </div>
+
+
+  <div>
+  <br><br><br>
+
+<script>
+
+  config = {};
+
+  function updateForceLocationPanel() {
+    if (config.forceLocation) {
+      $("#fixCoords").slideDown();
+    } else {
+      $("#fixCoords").slideUp();
+    }
+    $('#forceLoc').prop("checked",config.forceLocation)
+  }
+  function setSyncInterval(sender,interval) {
+    config.syncInterval = interval;
+    $('.btn').removeClass("active");
+    $(sender).addClass("active")
+  }
+
+  function saveOptions() {
+      config.apikey = $('#apikey').val();
+			document.location = 'pebblejs://close#' + encodeURIComponent(JSON.stringify(config));
+		}
+
+  function matchUIToSettingState() {
+    var hash = window.location.hash.substring(1);
+    hash = decodeURIComponent(hash);
+    hash = JSON.parse(hash);
+
+    config.forceLocation = hash.forceLocation;
+    config.syncInterval = hash.syncInterval;
+    config.apikey = hash.apikey;
+
+    updateForceLocationPanel();
+    setSyncInterval($('#int' + config.syncInterval),config.syncInterval);
+    $('#apikey').val(config.apikey);
+  }
+
+  $('#forceLoc').click(function() {
+    config.forceLocation = ! config.forceLocation;
+    updateForceLocationPanel();
+  });
+
+
+  //Inital load
+  matchUIToSettingState();
+
+
+</script>
+</body>
+</html>
