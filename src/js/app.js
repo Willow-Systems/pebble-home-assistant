@@ -2,6 +2,7 @@ var UI = require('ui');
 var ajax = require('ajax');
 var Wakeup = require('wakeup');
 var Settings = require('settings');
+var Vector = require('vector2');
 var Feature = require('platform/feature');
 var Platform = require('platform');
 var hass = require('./hass.js');
@@ -58,6 +59,12 @@ homeMenu = new UI.Menu({
 	highlightTextColor: 'white'
 });
 
+//Reused global variables
+wind_sensorDetail = null;
+menuPosToEntity = [];
+itemIndex = 0;
+
+
 function getEntityClass(entity_id) {
 	return entity_id.split(".")[0];
 }
@@ -65,6 +72,10 @@ function getEntityClass(entity_id) {
 
 //Pebble.addEventListener('ready', function() {
 	console.log("Lets Go!");
+	go();
+
+
+function go() {
 
 	if (Platform.version() == "aplite") {
 		console.log("Platform is aplite and icons make it sad. Disabling")
@@ -93,11 +104,12 @@ function getEntityClass(entity_id) {
 		}
 	});
 
+}
 //});
 
 function renderStatesMenu(data, filter) {
 	console.log("Filter: " + filter);
-	var menuPosToID = [];
+	menuPosToEntity = [];
 	var menuItemArray = [];
 
 	// console.log(JSON.stringify(data))
@@ -164,15 +176,10 @@ function renderStatesMenu(data, filter) {
 			} else if (entity.type == "binary_sensor") {
 
 				icon = "IMAGE_ICON_SENSOR"
-				subtitle = entity.state
+				subtitle = getCleanedState(entity)
 
 				if (entity.attributes.hasOwnProperty("device_class")) {
 					if (entity.attributes.device_class == "opening") {
-						subtitle = {
-							"on": "Open",
-							"off": "Closed"
-						}[entity.state]
-
 						icon = {
 							"on": "IMAGE_ICON_DOOR_OPEN",
 							"off": "IMAGE_ICON_DOOR_CLOSED",
@@ -205,7 +212,7 @@ function renderStatesMenu(data, filter) {
 			}
 
 			console.log("Add entity '" + entity.attributes.friendly_name + "' to list")
-			menuPosToID.push(entity);
+			menuPosToEntity.push(entity);
 
 			var o = {
 				title: title,
@@ -231,21 +238,21 @@ function renderStatesMenu(data, filter) {
 	});
 
 	mainMenu.on('select', function(e) {
-  	console.log('Long Pressed item #' + e.itemIndex + ' of section #' + e.sectionIndex);
-  	console.log('The item is titled "' + e.item.title + '"');
-		console.log('Resolved to entity ID ' + menuPosToID[e.itemIndex].entity_id);
+  	console.log('Short Pressed item #' + e.itemIndex + ' of section #' + e.sectionIndex);
+		console.log('Resolved to entity ID ' + menuPosToEntity[e.itemIndex].entity_id);
+		itemIndex = e.itemIndex
 		mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: '...' });
 
 		if (["light","switch"].indexOf(filter) != -1) {
 
-			hass.toggle(menuPosToID[e.itemIndex], function(data, itemIndex) {
+			hass.toggle(menuPosToEntity[e.itemIndex], function(data, itemIndex) {
 
 				console.log("Got this back: " + JSON.stringify(data))
 				for (var i = 0; i < data.length; i++) {
 				var entity = data[i];
-				if (getEntityClass(entity.entity_id) != "group" && entity.entity_id == menuPosToID[e.itemIndex].entity_id) {
-					// && entity.entity_id == menuPosToID[e.itemIndex]
-					// console.log("Does " + entity.entity_id + " match " + menuPosToID[e.itemIndex].entity_id)
+				if (getEntityClass(entity.entity_id) != "group" && entity.entity_id == menuPosToEntity[e.itemIndex].entity_id) {
+					// && entity.entity_id == menuPosToEntity[e.itemIndex]
+					// console.log("Does " + entity.entity_id + " match " + menuPosToEntity[e.itemIndex].entity_id)
 					data = entity;
 					break;
 				}
@@ -278,9 +285,12 @@ function renderStatesMenu(data, filter) {
 
 		} else if (filter == "sensor") {
 
-			hass.refresh(menuPosToID[e.itemIndex], function(data, itemIndex) {
+			hass.refresh(menuPosToEntity[e.itemIndex], function(data) {
 
 				console.log("Got this back: " + JSON.stringify(data))
+				//Update cache
+				menuPosToEntity[itemIndex] = data
+				console.log("Update cache @ " + itemIndex)
 
 				//This code repeats and that's terrible. I should feel bad. Need to fix this later
 				var icon = "IMAGE_ICON_SENSOR"
@@ -315,17 +325,158 @@ function renderStatesMenu(data, filter) {
 				if (config.enableIcons) {	o.icon = icon	}
 				mainMenu.item(0, e.itemIndex, o);
 
-			}, e.itemIndex)
+			})
 		}
 
 	});
 
 	mainMenu.on('longSelect', function(e) {
-		console.log("Unimplemented");
+		if (filter == "sensor") {
+			var s = menuPosToEntity[e.itemIndex];
+			console.log("Cached state: " + JSON.stringify(s))
+
+			//Get non-standard attributes to create the extra data field
+			var extraData = "";
+			var attrs = s.attributes;
+			var standardAttrs = ["friendly_name","icon","unit_of_measurement","device_class"];
+			for (var key in attrs) {
+				var value = attrs[key];
+				console.log("Check k:" + key + "  v:" + value)
+
+				if (standardAttrs.indexOf(key) == -1) {
+					console.log("OK")
+
+					var t = typeof value
+					console.log(t)
+
+					if (["string","number","boolean"].indexOf(t) != -1) {
+						extraData += key.replace(/_/g," ") + ": " + value
+					} else if (t == "object") {
+						//Not sure we'll ever get an object object, so only check for arrays
+						if (Array.isArray(value)) {
+							extraData += key.replace(/_/g," ") + ": " + value.join(",");
+						}
+					}
+
+					extraData += "\n"
+					console.log("ed: " + extraData)
+				}
+
+
+			}
+
+			if (s.hasOwnProperty("last_changed")) {
+				// extraData += "last changed: " + s.last_changed.split(".")[0].replace("T"," ")
+				extraData += "\n" + friendlyLastChanged(s.last_changed)
+			}
+
+			var state = getCleanedState(s);
+			if (attrs.hasOwnProperty("unit_of_measurement")) { state += " " + attrs.unit_of_measurement }
+
+			showSensorDetailWindow(attrs.friendly_name, state, e.item.icon, extraData);
+
+		} else {
+			console.log("Unimplemented");
+		}
 	});
 
 	mainMenu.show()
 
 	mainMenu.selection(0, 0);
 
+}
+
+function showSensorDetailWindow(_title, _value, _icon, _extraData) {
+	wind_sensorDetail = new UI.Window({
+		status: {
+	    color: 'black',
+    	backgroundColor: 'white',
+			seperator: "dotted"
+  	}
+	});
+	var windowBg = new UI.Rect({
+		backgroundColor: "white",
+		position: new Vector(0,0),
+		size: new Vector(144,168)
+	});
+
+	var titleFont = "gothic_24_bold"
+	if (_title.length > 17) { titleFont = "gothic_14_bold" }
+	var sensorName = new UI.Text({
+		text: _title,
+		color: Feature.color(colour.highlight, "black"),
+		font: titleFont,
+		position: new Vector(5,3),
+		size: new Vector(139,30)
+	});
+
+	if (config.enableIcons) {
+		var y = 18;
+		if (_title.length > 11) { y = 33 }
+		var sensorIcon = new UI.Image({
+  		position: new Vector(96, y),
+  		size: new Vector(25,25),
+			compositing: "set",
+    	backgroundColor: 'transparent',
+  		image: _icon
+		});
+	}
+
+	var sensorValue = new UI.Text({
+		text: _value,
+		color: "black",
+		font: "gothic_18_bold",
+		position: new Vector(5,30),
+		size: new Vector(100,25)
+	});
+
+	if (_extraData != null && _extraData != "") {
+		var sensorExtraDeets = new UI.Text({
+			text: _extraData,
+			color: "black",
+			font: "gothic_14",
+			position: new Vector(5,60),
+			size: new Vector(139,100)
+		});
+	}
+
+	wind_sensorDetail.add(windowBg);
+	if (config.enableIcons) { wind_sensorDetail.add(sensorIcon); }
+	if (_extraData != null && _extraData != "") { wind_sensorDetail.add(sensorExtraDeets); }
+	wind_sensorDetail.add(sensorValue);
+	wind_sensorDetail.add(sensorName);
+	wind_sensorDetail.show();
+}
+
+function getCleanedState(entity) {
+	var state = entity.state
+	if (entity.attributes.hasOwnProperty("device_class")) {
+		if (entity.attributes.device_class == "opening") {
+			state = {
+				"on": "Open",
+				"off": "Closed"
+			}[entity.state]
+		}
+	}
+	return state
+}
+function friendlyLastChanged(lc) {
+	var then = new Date(lc);
+	var now = new Date();
+	var delta = now - then;
+	var out = 99;	var units = "??";
+	delta = delta / 1000;
+	if (delta < 60) {
+		out = Math.floor(delta);
+		units = "seconds"
+	} else if (delta < 3600) {
+		out = Math.floor(delta / 60);
+		units = "minutes"
+		if (out < 2) { units = "minute"	}
+	} else {
+		out = Math.floor(delta / 3600)
+		units = "hours"
+		if (out < 2) { units = "hour" }
+	}
+	return out + " " + units + " ago";
 }
