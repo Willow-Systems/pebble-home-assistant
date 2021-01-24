@@ -20,7 +20,8 @@ There are only two 'Home Assistant' apps on the [Rebble app store](https://apps.
   - [X] Turn switches on / off
 - Sensors:
   - [X] List sensors from Home assistant
-  - [ ] Support standard/popular sensor attributes
+  - [X] Show detailed overview page
+  - [X] Support standard/popular sensor attributes
 - Automations:
   - [X] List automations in home assistant
   - [ ] Enable / disable automations
