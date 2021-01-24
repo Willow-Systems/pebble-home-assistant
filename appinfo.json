@@ -79,6 +79,26 @@
         "type": "png"
       },
       {
+        "file": "images/micro_tick_active.png",
+        "name": "IMAGE_MICRO_TICK_ACTIVE",
+        "type": "png"
+      },
+      {
+        "file": "images/micro_tick.png",
+        "name": "IMAGE_MICRO_TICK",
+        "type": "png"
+      },
+      {
+        "file": "images/micro_brightness.png",
+        "name": "IMAGE_MICRO_BRIGHTNESS",
+        "type": "png"
+      },
+      {
+        "file": "images/micro_temp.png",
+        "name": "IMAGE_MICRO_TEMP",
+        "type": "png"
+      },
+      {
         "file": "images/icon_unknown.png",
         "name": "IMAGE_ICON_UNKNOWN",
         "type": "png"
@@ -88,7 +108,6 @@
   "sdkVersion": "3",
   "shortName": "Hass.io",
   "targetPlatforms": [
-    "aplite",
     "basalt"
   ],
   "uuid": "e72aed38-ceda-412b-bb20-3f606494cd1a",

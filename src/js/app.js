@@ -20,7 +20,10 @@ var config = {
 	showSwitches: true,
 	showSensors: true,
 	showAutomations: false,
-	enableIcons: true
+	enableIcons: true,
+	ux: {
+		hasChangedLightOperationsBefore: false
+	}
 }
 
 var sensorConfig = {
@@ -64,6 +67,10 @@ wind_sensorDetail = null;
 menuPosToEntity = [];
 itemIndex = 0;
 
+//Global light details page variables
+brightnessMenuActiveItem = 0;
+brightnessUI = {};
+
 
 function getEntityClass(entity_id) {
 	return entity_id.split(".")[0];
@@ -72,7 +79,23 @@ function getEntityClass(entity_id) {
 
 //Pebble.addEventListener('ready', function() {
 	console.log("Lets Go!");
-	go();
+	// go();
+	showLightDetailWindow({
+    "attributes": {
+			"brightness": "150",
+      "friendly_name": "Wills Office",
+      "supported_features": 41
+    },
+    "context": {
+      "id": "7d71eeccfb694746a658acf3a1b63776",
+      "parent_id": null,
+      "user_id": null
+    },
+    "entity_id": "light.wills_office",
+    "last_changed": "2021-01-23T10:13:49.081544+00:00",
+    "last_updated": "2021-01-23T10:13:49.081544+00:00",
+    "state": "on"
+  });
 
 
 function go() {
@@ -375,6 +398,9 @@ function renderStatesMenu(data, filter) {
 
 			showSensorDetailWindow(attrs.friendly_name, state, e.item.icon, extraData);
 
+		} else if (filter == "light") {
+			var s = menuPosToEntity[e.itemIndex];
+			showLightDetailWindow(s);
 		} else {
 			console.log("Unimplemented");
 		}
@@ -446,6 +472,314 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData) {
 	wind_sensorDetail.add(sensorValue);
 	wind_sensorDetail.add(sensorName);
 	wind_sensorDetail.show();
+}
+
+function calcBrightnessRectPosition(bri) {
+	var res = [144,168];
+	var out = {
+		x: 0,
+		w: res[0]
+	};
+	out.y = Math.floor(res[1] - ((res[1] / 100) * bri));
+	out.h = Math.floor(res[1] - out.y);
+	return out
+}
+function updateBrightness(entity, brightness) {
+	//Do a call and use this code in the callback eventually
+	var bri_abs = (255 / 100) * brightness
+
+	//Hack
+	entity.attributes.brightness = bri_abs
+	refreshLightDetailUI(entity)
+}
+function refreshLightDetailUI(state) {
+	if (! state.attributes.hasOwnProperty("brightness")) { state.attributes.brightness = 0; }
+
+	//Turn absolute brightness back into %
+	var bri_perc = Math.ceil((100 / 255) * parseInt(state.attributes.brightness));
+
+	var indicator = {
+		0: "IMAGE_MICRO_TICK",
+		1: "IMAGE_MICRO_TICK",
+		2: "IMAGE_MICRO_TICK"
+	}
+	indicator[brightnessMenuActiveItem] = "IMAGE_MICRO_TICK_ACTIVE"
+
+	var lineColour = {
+		0: "black",
+		1: "black",
+		2: "black"
+	}
+	lineColour[brightnessMenuActiveItem] = Feature.color(colour.highlight, "black")
+
+	brightnessUI.line_brightness.strokeColor(lineColour[0]);
+	//brightnessUI.line_temperature.strokeColor(lineColour[1]);
+	var tempLineColours = {
+		0: "#00AAFF",
+		1: "#00FFFF",
+		2: "#AAFFFF",
+		3: "#FFFFFF",
+		4: "#FFFFAA",
+		5: "#FFFF55",
+		6: "#FFAA55",
+		7: "#FFAA00",
+	}
+	var tempX = 15
+	for (var i = 0; i < 8; i++) {
+		var lc = "black"
+		if (brightnessMenuActiveItem == 1) { lc = Feature.color(tempLineColours[i], "black")	}
+		brightnessUI["line_temperature_" + i].strokeColor(lc)
+	}
+
+	brightnessUI.tick_brightness.image(indicator[0])
+	brightnessUI.tick_temperature.image(indicator[1])
+
+	var tickLeft = 10 + ((125 / 100) * bri_perc);
+	brightnessUI.tick_brightness.position(new Vector(tickLeft,74))
+
+
+
+	if (brightnessMenuActiveItem == 0) {
+		brightnessUI.lblpercentage.text(bri_perc + "%");
+	}
+
+}
+function showLightDetailWindow(entity) {
+
+	console.log("=============")
+	console.log(JSON.stringify(entity))
+	console.log("=============")
+
+	var brightnessPerc = 75
+	//for brightnessMenuActiveItem: 0 = brightness, 1 = temperature, 2 = colour
+
+	wind_lightDetail = new UI.Window({
+		status: {
+	    color: 'black',
+    	backgroundColor: 'white',
+			seperator: "dotted"
+  	}
+	});
+
+	var windowBg = new UI.Rect({
+		backgroundColor: "white",
+		position: new Vector(0,0),
+		size: new Vector(144,168)
+	});
+
+	var bgp = calcBrightnessRectPosition(brightnessPerc);
+	console.log(JSON.stringify(bgp));
+	brightnessUI.brightnessRect = new UI.Rect({
+		backgroundColor: Feature.color(colour.highlight, "#AAAAAA"),
+		position: new Vector(bgp.x, bgp.y),
+		size: new Vector(bgp.w, bgp.h)
+	});
+
+	var title = "Wills Office"
+	var titleFont = "gothic_24_bold"
+	if (title.length > 17) { titleFont = "gothic_14_bold" }
+	var lightName = new UI.Text({
+		text: title,
+		color: Feature.color(colour.highlight, "Black"),
+		font: titleFont,
+		position: new Vector(5,3),
+		size: new Vector(139,30)
+	});
+
+	if (config.enableIcons) {
+		var y = 8;
+		if (title.length > 17) { y = 33 }
+		brightnessUI.icon = new UI.Image({
+  		position: new Vector(115, y),
+  		size: new Vector(25,25),
+			compositing: "set",
+    	backgroundColor: 'transparent',
+  		image: "IMAGE_ICON_BULB"
+		});
+	}
+
+	brightnessUI.lblpercentage = new UI.Text({
+		text: "75%",
+		color: "Black",
+		font: "gothic_14_bold",
+		position: new Vector(6,32),
+		size: new Vector(139,30)
+	});
+
+	var indicator = {
+		0: "IMAGE_MICRO_TICK",
+		1: "IMAGE_MICRO_TICK",
+		2: "IMAGE_MICRO_TICK"
+	}
+	indicator[brightnessMenuActiveItem] = "IMAGE_MICRO_TICK_ACTIVE"
+
+	var lineColour = {
+		0: "black",
+		1: "black",
+		2: "black"
+	}
+	lineColour[brightnessMenuActiveItem] = Feature.color(colour.highlight, "black")
+
+
+	brightnessUI.line_brightness = new UI.Line({
+  	position: new Vector(15, 80),
+  	position2: new Vector(140, 80),
+  	strokeColor: lineColour[0],
+		strokeWidth: 2
+	});
+	brightnessUI.tick_brightness = new UI.Image({
+		position: new Vector(62, 74),
+	 	size: new Vector(9,5),
+		compositing: "set",
+	  backgroundColor: 'transparent',
+	 	image: indicator[0]
+	});
+	brightnessUI.icon_brightness = new UI.Image({
+		position: new Vector(2, 75),
+	 	size: new Vector(10,10),
+		compositing: "set",
+	  backgroundColor: 'transparent',
+	 	image: "IMAGE_MICRO_BRIGHTNESS"
+	});
+
+
+	var tempLineColours = {
+		0: "#00AAFF",
+		1: "#00FFFF",
+		2: "#AAFFFF",
+		3: "#FFFFFF",
+		4: "#FFFFAA",
+		5: "#FFFF55",
+		6: "#FFAA55",
+		7: "#FFAA00",
+	}
+	var tempX = 15
+	for (var i = 0; i < 8; i++) {
+		var lc = "black"
+		if (brightnessMenuActiveItem == 1) { lc = Feature.color(tempLineColours[i], "black") }
+
+		brightnessUI["line_temperature_" + i] = new UI.Line({
+			position: new Vector(tempX, 100),
+			position2: new Vector(tempX + 15.625, 100),
+			strokeColor: lc,
+			strokeWidth: 2
+		});
+
+		tempX += 15.625;
+	}
+
+	brightnessUI.tick_temperature = new UI.Image({
+		position: new Vector(62, 94),
+	 	size: new Vector(9,5),
+		compositing: "set",
+	  backgroundColor: 'transparent',
+	 	image: indicator[1]
+	});
+	brightnessUI.icon_temperature = new UI.Image({
+		position: new Vector(2, 95),
+	 	size: new Vector(10,10),
+		compositing: "set",
+	  backgroundColor: 'transparent',
+	 	image: "IMAGE_MICRO_TEMP"
+	});
+
+
+	// brightnessUI.opt_brightness = new UI.Text({
+	// 	text: "> Change Brightness",
+	// 	color: "Black",
+	// 	font: "gothic_14_bold",
+	// 	position: new Vector(5,55),
+	// 	size: new Vector(139,30)
+	// });
+	//
+	// brightnessUI.opt_temperature = new UI.Text({
+	// 	text: "   Change Temperature",
+	// 	color: "Black",
+	// 	font: "gothic_14",
+	// 	position: new Vector(5,75),
+	// 	size: new Vector(139,30)
+	// });
+	//
+	// brightnessUI.opt_colour = new UI.Text({
+	// 	text: "   Change Colour",
+	// 	color: "Black",
+	// 	font: "gothic_14",
+	// 	position: new Vector(5,95),
+	// 	size: new Vector(139,30)
+	// });
+	//
+	brightnessUI.ux_explain = new UI.Text({
+		text: "(Press select to cycle)",
+		color: "Black",
+		font: "gothic_14",
+		position: new Vector(15,133),
+		size: new Vector(139,30)
+	});
+
+	wind_lightDetail.add(windowBg);
+	// wind_lightDetail.add(brightnessUI.brightnessRect);
+	if (config.enableIcons) { wind_lightDetail.add(brightnessUI.icon); }
+	wind_lightDetail.add(lightName);
+	wind_lightDetail.add(brightnessUI.lblpercentage);
+	wind_lightDetail.add(brightnessUI.line_brightness);
+	wind_lightDetail.add(brightnessUI.tick_brightness);
+	wind_lightDetail.add(brightnessUI.icon_brightness);
+	for (var i = 0; i < 8; i++) {
+		wind_lightDetail.add(brightnessUI["line_temperature_" + i]);
+	}
+	wind_lightDetail.add(brightnessUI.tick_temperature);
+	wind_lightDetail.add(brightnessUI.icon_temperature);
+	// wind_lightDetail.add(brightnessUI.opt_brightness);
+	// wind_lightDetail.add(brightnessUI.opt_temperature);
+	// wind_lightDetail.add(brightnessUI.opt_colour);
+	if (config.ux.hasChangedLightOperationsBefore == false) { wind_lightDetail.add(brightnessUI.ux_explain) }
+	wind_lightDetail.show();
+
+	wind_lightDetail.on('click', 'up', function() {
+  	if (brightnessMenuActiveItem == 0) {
+			//Affecting brightness
+			brightnessPerc += 5;
+			if (brightnessPerc > 100) { brightnessPerc = 100 }
+			updateBrightness(entity, brightnessPerc);
+		}
+	});
+	wind_lightDetail.on('longClick', 'up', function() {
+  	if (brightnessMenuActiveItem == 0) {
+			//Affecting brightness
+			brightnessPerc += 20;
+			if (brightnessPerc > 100) { brightnessPerc = 100 }
+			updateBrightness(entity, brightnessPerc);
+		}
+	});
+
+	wind_lightDetail.on('click', 'down', function() {
+  	if (brightnessMenuActiveItem == 0) {
+			//Affecting brightness
+			brightnessPerc -= 5;
+			if (brightnessPerc < 0) { brightnessPerc = 0 }
+			updateBrightness(entity, brightnessPerc);
+		}
+	});
+	wind_lightDetail.on('longClick', 'down', function() {
+  	if (brightnessMenuActiveItem == 0) {
+			//Affecting brightness
+			brightnessPerc -= 20;
+			if (brightnessPerc < 0) { brightnessPerc = 0 }
+			updateBrightness(entity, brightnessPerc);
+		}
+	});
+
+	wind_lightDetail.on('click', 'select', function() {
+  	brightnessMenuActiveItem += 1;
+		if (brightnessMenuActiveItem > 2) { brightnessMenuActiveItem = 0 }
+		if (config.ux.hasChangedLightOperationsBefore == false) {
+			config.ux.hasChangedLightOperationsBefore = true;
+			brightnessUI.ux_explain.animate({
+				position: new Vector(15,170)
+			}, 1000)
+		}
+		refreshLightDetailUI(entity);
+	});
 }
 
 function getCleanedState(entity) {
