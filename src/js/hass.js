@@ -55,6 +55,14 @@ function getStates(cb, filter) {
   makeGetRequest("/states", cb, filter)
 }
 
+function setLightBrightness(entity, brightness, cb) {
+  var postData = {
+    entity_id: entity.entity_id,
+    brightness: brightness
+  }
+  console.log("Making post request to brightness up");
+  makePostRequest("/services/light/turn_on", postData, cb)
+}
 
 function toggle(entity, cb) {
 
@@ -89,3 +97,4 @@ function refresh(entity, cb) {
 module.exports.getStates = getStates;
 module.exports.toggle = toggle;
 module.exports.refresh = refresh;
+module.exports.setLightBrightness = setLightBrightness;

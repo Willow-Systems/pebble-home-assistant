@@ -71,6 +71,8 @@ itemIndex = 0;
 brightnessMenuActiveItem = 0;
 brightnessUI = {};
 
+//Find a better solution to this PLEASE
+brightnessUpEntityID = null;
 
 function getEntityClass(entity_id) {
 	return entity_id.split(".")[0];
@@ -79,23 +81,26 @@ function getEntityClass(entity_id) {
 
 //Pebble.addEventListener('ready', function() {
 	console.log("Lets Go!");
-	// go();
-	showLightDetailWindow({
-    "attributes": {
-			"brightness": "150",
-      "friendly_name": "Wills Office",
-      "supported_features": 41
-    },
-    "context": {
-      "id": "7d71eeccfb694746a658acf3a1b63776",
-      "parent_id": null,
-      "user_id": null
-    },
-    "entity_id": "light.wills_office",
-    "last_changed": "2021-01-23T10:13:49.081544+00:00",
-    "last_updated": "2021-01-23T10:13:49.081544+00:00",
-    "state": "on"
-  });
+	go();
+	// showLightDetailWindow({
+  //   "attributes": {
+	// 		"brightness": "150",
+  //     "friendly_name": "Wills Office",
+  //     "supported_features": 41,
+	// 		"max_mireds": 500,
+	// 		"min_mireds": 153,
+	// 		"color_temp": 326
+  //   },
+  //   "context": {
+  //     "id": "7d71eeccfb694746a658acf3a1b63776",
+  //     "parent_id": null,
+  //     "user_id": null
+  //   },
+  //   "entity_id": "light.wills_office",
+  //   "last_changed": "2021-01-23T10:13:49.081544+00:00",
+  //   "last_updated": "2021-01-23T10:13:49.081544+00:00",
+  //   "state": "on"
+  // });
 
 
 function go() {
@@ -487,9 +492,31 @@ function calcBrightnessRectPosition(bri) {
 function updateBrightness(entity, brightness) {
 	//Do a call and use this code in the callback eventually
 	var bri_abs = (255 / 100) * brightness
+	if (bri_abs > 254) { bri_abs = 255 }
+
+	brightnessUpEntityID = entity.entity_id
+	console.log("Calling hass to update brightness for " + brightnessUpEntityID);
+	hass.setLightBrightness(entity, bri_abs, function(entities) {
+		console.log("Brightness up callback running");
+		//We get a list of entities back, find ours.
+		for (var i = 0; i < entities.length; i++) {
+			var entity = entities[i];
+			if (entity.entity_id == brightnessUpEntityID) {
+				refreshLightDetailUI(entity);
+				break;
+			}
+		}
+	})
+	//Hack
+	// entity.attributes.brightness = bri_abs
+
+}
+function updateTemperature(entity, colorTemp) {
+	//Do a call and use this code in the callback eventually
+	console.log("Update colour temp to " + colorTemp)
 
 	//Hack
-	entity.attributes.brightness = bri_abs
+	entity.attributes.color_temp	= colorTemp
 	refreshLightDetailUI(entity)
 }
 function refreshLightDetailUI(state) {
@@ -497,6 +524,10 @@ function refreshLightDetailUI(state) {
 
 	//Turn absolute brightness back into %
 	var bri_perc = Math.ceil((100 / 255) * parseInt(state.attributes.brightness));
+
+	state.meta = {}
+	state.meta.supportsRGB = state.attributes.hasOwnProperty("rgb_color");
+	state.meta.supportsTemperature = state.attributes.hasOwnProperty("max_mireds");
 
 	var indicator = {
 		0: "IMAGE_MICRO_TICK",
@@ -512,8 +543,8 @@ function refreshLightDetailUI(state) {
 	}
 	lineColour[brightnessMenuActiveItem] = Feature.color(colour.highlight, "black")
 
+	//Line colours
 	brightnessUI.line_brightness.strokeColor(lineColour[0]);
-	//brightnessUI.line_temperature.strokeColor(lineColour[1]);
 	var tempLineColours = {
 		0: "#00AAFF",
 		1: "#00FFFF",
@@ -534,13 +565,42 @@ function refreshLightDetailUI(state) {
 	brightnessUI.tick_brightness.image(indicator[0])
 	brightnessUI.tick_temperature.image(indicator[1])
 
+	//Calc position for slider for brightness
 	var tickLeft = 10 + ((125 / 100) * bri_perc);
-	brightnessUI.tick_brightness.position(new Vector(tickLeft,74))
+	brightnessUI.tick_brightness.animate({position: new Vector(tickLeft,74)})
+
+	if (state.attributes.hasOwnProperty("max_mireds")) {
+		//Calc ticker position for colour temp
+		var tickWidth = state.attributes.max_mireds - state.attributes.min_mireds
+		// console.log("Calc colourtemp left. Colour space with is " + tickWidth)
+		tickLeft = ((state.attributes.color_temp - state.attributes.min_mireds) / tickWidth) * 100;
+		// console.log("Therefore, % of color space for " + state.attributes.color_temp + " is " + tickLeft)
+		tickLeft = 10 + ((125 / 100) * tickLeft);
+		// console.log("Therefore, absolute left is " + tickLeft)
+		brightnessUI.tick_temperature.animate({position: new Vector(tickLeft,94)})
+	}
 
 
+	//Update active pointer
+	// var pos = {};
+	// if (brightnessMenuActiveItem == 0) { pos = brightnessUI.tick_brightness.position() }
+	// if (brightnessMenuActiveItem == 1) { pos = brightnessUI.tick_temperature.position() }
+	// brightnessUI.active_ticker.animate({
+	// 	position: pos
+	// },200)
 
+
+	//Hide indicator tick for active item, update subtitle
+	// brightnessUI.tick_brightness.compositing("set");
+	// brightnessUI.tick_temperature.compositing("set");
 	if (brightnessMenuActiveItem == 0) {
 		brightnessUI.lblpercentage.text(bri_perc + "%");
+		// brightnessUI.tick_brightness.compositing("and");
+	} else if (brightnessMenuActiveItem == 1) {
+		//mireds to kelvin
+		var kelv = Math.ceil(1000000 / state.attributes.color_temp)
+		brightnessUI.lblpercentage.text(kelv + "K");
+		// brightnessUI.tick_temperature.compositing("and");
 	}
 
 }
@@ -549,6 +609,10 @@ function showLightDetailWindow(entity) {
 	console.log("=============")
 	console.log(JSON.stringify(entity))
 	console.log("=============")
+
+	entity.meta = {}
+	entity.meta.supportsRGB = entity.attributes.hasOwnProperty("rgb_color");
+	entity.meta.supportsTemperature = entity.attributes.hasOwnProperty("max_mireds");
 
 	var brightnessPerc = 75
 	//for brightnessMenuActiveItem: 0 = brightness, 1 = temperature, 2 = colour
@@ -683,6 +747,14 @@ function showLightDetailWindow(entity) {
 	 	image: "IMAGE_MICRO_TEMP"
 	});
 
+	// brightnessUI.active_ticker = new UI.Image({
+	// 	position: new Vector(62, 74),
+	// 	size: new Vector(9,6),
+	// 	compositing: "set",
+	// 	backgroundColor: 'transparent',
+	// 	image: "IMAGE_MICRO_TICK_ACTIVE"
+	// })
+
 
 	// brightnessUI.opt_brightness = new UI.Text({
 	// 	text: "> Change Brightness",
@@ -733,44 +805,73 @@ function showLightDetailWindow(entity) {
 	// wind_lightDetail.add(brightnessUI.opt_temperature);
 	// wind_lightDetail.add(brightnessUI.opt_colour);
 	if (config.ux.hasChangedLightOperationsBefore == false) { wind_lightDetail.add(brightnessUI.ux_explain) }
+	// wind_lightDetail.add(brightnessUI.active_ticker);
 	wind_lightDetail.show();
+	refreshLightDetailUI(entity);
 
 	wind_lightDetail.on('click', 'up', function() {
-  	if (brightnessMenuActiveItem == 0) {
-			//Affecting brightness
-			brightnessPerc += 5;
-			if (brightnessPerc > 100) { brightnessPerc = 100 }
-			updateBrightness(entity, brightnessPerc);
-		}
-	});
-	wind_lightDetail.on('longClick', 'up', function() {
   	if (brightnessMenuActiveItem == 0) {
 			//Affecting brightness
 			brightnessPerc += 20;
 			if (brightnessPerc > 100) { brightnessPerc = 100 }
 			updateBrightness(entity, brightnessPerc);
+
+		} else if (brightnessMenuActiveItem == 1) {
+			//Affecting colour temp
+			var ct = entity.attributes.color_temp
+			ct += 30;
+			console.log("CT: " + ct)
+			console.log("Mmr: " + entity.attributes.max_mireds)
+			if (ct > entity.attributes.max_mireds) { ct = entity.attributes.max_mireds }
+			updateTemperature(entity, ct);
+
+		}
+	});
+	wind_lightDetail.on('longClick', 'up', function() {
+  	if (brightnessMenuActiveItem == 0) {
+			//Affecting brightness
+			brightnessPerc += 50;
+			if (brightnessPerc > 100) { brightnessPerc = 100 }
+			updateBrightness(entity, brightnessPerc);
+		} else if (brightnessMenuActiveItem == 1) {
+			var ct = entity.attributes.color_temp
+			ct += 40;
+			if (ct > entity.attributes.max_mireds) { ct = entity.attributes.max_mireds }
+			updateTemperature(entity, ct);
 		}
 	});
 
 	wind_lightDetail.on('click', 'down', function() {
   	if (brightnessMenuActiveItem == 0) {
 			//Affecting brightness
-			brightnessPerc -= 5;
+			brightnessPerc -= 20;
 			if (brightnessPerc < 0) { brightnessPerc = 0 }
 			updateBrightness(entity, brightnessPerc);
+		} else if (brightnessMenuActiveItem == 1) {
+			var ct = entity.attributes.color_temp
+			ct -= 20;
+			if (ct < entity.attributes.min_mireds) { ct = entity.attributes.min_mireds }
+			updateTemperature(entity, ct);
 		}
 	});
 	wind_lightDetail.on('longClick', 'down', function() {
   	if (brightnessMenuActiveItem == 0) {
 			//Affecting brightness
-			brightnessPerc -= 20;
+			brightnessPerc -= 50;
 			if (brightnessPerc < 0) { brightnessPerc = 0 }
 			updateBrightness(entity, brightnessPerc);
+		} else if (brightnessMenuActiveItem == 1) {
+			var ct = entity.attributes.color_temp
+			ct -= 40;
+			if (ct < entity.attributes.min_mireds) { ct = entity.attributes.min_mireds }
+			updateTemperature(entity, ct);
 		}
 	});
 
 	wind_lightDetail.on('click', 'select', function() {
   	brightnessMenuActiveItem += 1;
+		if (entity.meta.supportsTemperature == false && brightnessMenuActiveItem > 0) { brightnessMenuActiveItem = 0}
+		if (entity.meta.supportsRGB == false && brightnessMenuActiveItem > 1) { brightnessMenuActiveItem = 0}
 		if (brightnessMenuActiveItem > 2) { brightnessMenuActiveItem = 0 }
 		if (config.ux.hasChangedLightOperationsBefore == false) {
 			config.ux.hasChangedLightOperationsBefore = true;
