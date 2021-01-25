@@ -74,6 +74,11 @@ brightnessUI = {};
 //Find a better solution to this PLEASE
 brightnessUpEntityID = null;
 
+var wayBack = {
+	brightnessChange: null,
+	temperatureChange: null
+}
+
 function getEntityClass(entity_id) {
 	return entity_id.split(".")[0];
 }
@@ -179,7 +184,7 @@ function renderStatesMenu(data, filter) {
 				if (entity.state == "on" && entity.attributes.hasOwnProperty("brightness")) {
 					var bri = parseInt(entity.attributes.brightness);
 					bri = bri / 255 * 100;
-					subtitle += " (" + Math.floor(bri) + "%)"
+					subtitle += " (" + Math.ceil(bri) + "%)"
 				}
 
 			} else if (entity.type == "switch") {
@@ -294,7 +299,7 @@ function renderStatesMenu(data, filter) {
 				if (entity.state == "on" && data.attributes.hasOwnProperty("brightness")) {
 				var bri = parseInt(data.attributes.brightness);
 				bri = bri / 255 * 100;
-				subtitle += " (" + Math.floor(bri) + "%)"
+				subtitle += " (" + Math.ceil(bri) + "%)"
 			}
 				if (getEntityClass(entity.entity_id) == "light") {
 				if (entity.state == "on") { icon = "IMAGE_ICON_BULB_ON" }
@@ -417,6 +422,48 @@ function renderStatesMenu(data, filter) {
 
 }
 
+function updateMainMenuEntity(entity) {
+	//Call this function when returning to the mainMenu to update the entity state of a specific item
+	console.log("Update state of mainMenu entity " + entity.entity_id)
+	for (var i = 0; i < menuPosToEntity.length; i++) {
+		if (menuPosToEntity[i].entity_id == entity.entity_id) {
+			//We have located the position in the menu of the entity to update
+			//Determine the data format based on entity type
+			console.log("Located menu position of " + entity.entity_id + ": " + i)
+
+			var updateObj = {};
+			var etype = getEntityClass(entity.entity_id)
+
+			if (etype == "light") {
+
+				updateObj = {
+					title: entity.attributes.friendly_name,
+					subtitle: entity.state
+				}
+				if (entity.state == "on" && entity.attributes.hasOwnProperty("brightness")) {
+					var bri = parseInt(entity.attributes.brightness);
+					bri = bri / 255 * 100;
+					updateObj.subtitle += " (" + Math.ceil(bri) + "%)"
+				}
+				if (config.enableIcons) {
+					if (entity.state == "on") {
+						updateObj.icon = "IMAGE_ICON_BULB_ON"
+					} else {
+						updateObj.icon = "IMAGE_ICON_BULB"
+					}
+				}
+
+			}
+
+			//Update menu
+			console.log("Update mainMenu index " + i + " to " + JSON.stringify(updateObj))
+			mainMenu.item(0, i, updateObj);
+			break;
+
+		}
+	}
+}
+
 function showSensorDetailWindow(_title, _value, _icon, _extraData) {
 	wind_sensorDetail = new UI.Window({
 		status: {
@@ -479,29 +526,19 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData) {
 	wind_sensorDetail.show();
 }
 
-function calcBrightnessRectPosition(bri) {
-	var res = [144,168];
-	var out = {
-		x: 0,
-		w: res[0]
-	};
-	out.y = Math.floor(res[1] - ((res[1] / 100) * bri));
-	out.h = Math.floor(res[1] - out.y);
-	return out
-}
 function updateBrightness(entity, brightness) {
 	//Do a call and use this code in the callback eventually
 	var bri_abs = (255 / 100) * brightness
 	if (bri_abs > 254) { bri_abs = 255 }
 
-	brightnessUpEntityID = entity.entity_id
-	console.log("Calling hass to update brightness for " + brightnessUpEntityID);
+	wayBack.brightnessChange = entity.entity_id
+	console.log("Calling hass to update brightness for " + wayBack.brightnessChange);
 	hass.setLightBrightness(entity, bri_abs, function(entities) {
 		console.log("Brightness up callback running");
 		//We get a list of entities back, find ours.
 		for (var i = 0; i < entities.length; i++) {
 			var entity = entities[i];
-			if (entity.entity_id == brightnessUpEntityID) {
+			if (entity.entity_id == wayBack.brightnessChange) {
 				refreshLightDetailUI(entity);
 				break;
 			}
@@ -514,20 +551,48 @@ function updateBrightness(entity, brightness) {
 function updateTemperature(entity, colorTemp) {
 	//Do a call and use this code in the callback eventually
 	console.log("Update colour temp to " + colorTemp)
+	wayBack.temperatureChange = entity.entity_id
+
+	hass.setLightTemperature(entity, colorTemp, function(entities) {
+		console.log("Light temperature change callback running");
+		//We get a list of entities back, find ours.
+		for (var i = 0; i < entities.length; i++) {
+			var entity = entities[i];
+			if (entity.entity_id == wayBack.temperatureChange) {
+				refreshLightDetailUI(entity);
+				break;
+			}
+		}
+	});
 
 	//Hack
-	entity.attributes.color_temp	= colorTemp
-	refreshLightDetailUI(entity)
+	// entity.attributes.color_temp	= colorTemp
+	// refreshLightDetailUI(entity)
 }
 function refreshLightDetailUI(state) {
 	if (! state.attributes.hasOwnProperty("brightness")) { state.attributes.brightness = 0; }
+
+	console.log("Refresh UI based on state: " + JSON.stringify(state))
 
 	//Turn absolute brightness back into %
 	var bri_perc = Math.ceil((100 / 255) * parseInt(state.attributes.brightness));
 
 	state.meta = {}
 	state.meta.supportsRGB = state.attributes.hasOwnProperty("rgb_color");
-	state.meta.supportsTemperature = state.attributes.hasOwnProperty("max_mireds");
+	state.meta.supportsTemperature = (state.attributes.hasOwnProperty("max_mireds") && state.attributes.hasOwnProperty("color_temp"));
+
+	//The mired range can be huge, we need to calculate 10% for shortclick, 30% for longclick
+	if (state.meta.supportsTemperature) {
+		console.log("-=-=-=-=-=-=-=-=-=-=-")
+		var miredRange = state.attributes.max_mireds - state.attributes.min_mireds
+		state.meta.miredJumpSmall = Math.floor((miredRange / 100) * 10);
+		state.meta.miredJumpLarge = Math.floor((miredRange / 100) * 30);
+	}
+
+	// //Although lights that support temp always return min/max temp, they don't always return the current temp. Set to 50% space if so.
+	// if (state.meta.supportsTemperature && ! state.attributes.hasOwnProperty("color_temp")) {
+	// 	state.attributes.color_temp = state.attributes.max_mireds - ((state.attributes.max_mireds - state.attributes.min_mireds) / 2)
+	// }
 
 	var indicator = {
 		0: "IMAGE_MICRO_TICK",
@@ -552,8 +617,8 @@ function refreshLightDetailUI(state) {
 		3: "#FFFFFF",
 		4: "#FFFFAA",
 		5: "#FFFF55",
-		6: "#FFAA55",
-		7: "#FFAA00",
+		6: "#FFFF00",
+		7: "#FFAA55",
 	}
 	var tempX = 15
 	for (var i = 0; i < 8; i++) {
@@ -562,6 +627,7 @@ function refreshLightDetailUI(state) {
 		brightnessUI["line_temperature_" + i].strokeColor(lc)
 	}
 
+	//Update ticks
 	brightnessUI.tick_brightness.image(indicator[0])
 	brightnessUI.tick_temperature.image(indicator[1])
 
@@ -569,7 +635,9 @@ function refreshLightDetailUI(state) {
 	var tickLeft = 10 + ((125 / 100) * bri_perc);
 	brightnessUI.tick_brightness.animate({position: new Vector(tickLeft,74)})
 
-	if (state.attributes.hasOwnProperty("max_mireds")) {
+	if (state.meta.supportsTemperature) {
+		//Unhide control if hidden
+		brightnessUI.hide_temperature.backgroundColor("transparent");
 		//Calc ticker position for colour temp
 		var tickWidth = state.attributes.max_mireds - state.attributes.min_mireds
 		// console.log("Calc colourtemp left. Colour space with is " + tickWidth)
@@ -578,31 +646,25 @@ function refreshLightDetailUI(state) {
 		tickLeft = 10 + ((125 / 100) * tickLeft);
 		// console.log("Therefore, absolute left is " + tickLeft)
 		brightnessUI.tick_temperature.animate({position: new Vector(tickLeft,94)})
+	} else {
+		//Hide temperature control. Entity doesn't support it
+		brightnessUI.hide_temperature.backgroundColor("white");
 	}
 
 
-	//Update active pointer
-	// var pos = {};
-	// if (brightnessMenuActiveItem == 0) { pos = brightnessUI.tick_brightness.position() }
-	// if (brightnessMenuActiveItem == 1) { pos = brightnessUI.tick_temperature.position() }
-	// brightnessUI.active_ticker.animate({
-	// 	position: pos
-	// },200)
-
-
-	//Hide indicator tick for active item, update subtitle
-	// brightnessUI.tick_brightness.compositing("set");
-	// brightnessUI.tick_temperature.compositing("set");
 	if (brightnessMenuActiveItem == 0) {
-		brightnessUI.lblpercentage.text(bri_perc + "%");
-		// brightnessUI.tick_brightness.compositing("and");
+		if (bri_perc < 1) {
+			brightnessUI.lblSelectedState.text("Off");
+		} else {
+			brightnessUI.lblSelectedState.text(bri_perc + "%");
+		}
 	} else if (brightnessMenuActiveItem == 1) {
 		//mireds to kelvin
 		var kelv = Math.ceil(1000000 / state.attributes.color_temp)
-		brightnessUI.lblpercentage.text(kelv + "K");
-		// brightnessUI.tick_temperature.compositing("and");
+		brightnessUI.lblSelectedState.text(kelv + "K");
 	}
 
+	brightnessUI.activeEntity = state
 }
 function showLightDetailWindow(entity) {
 
@@ -614,8 +676,24 @@ function showLightDetailWindow(entity) {
 	entity.meta.supportsRGB = entity.attributes.hasOwnProperty("rgb_color");
 	entity.meta.supportsTemperature = entity.attributes.hasOwnProperty("max_mireds");
 
-	var brightnessPerc = 75
+	//The mired range can be huge, we need to calculate 10% for shortclick, 30% for longclick
+	if (entity.meta.supportsTemperature) {
+		var miredRange = entity.attributes.max_mireds - entity.attributes.min_mireds
+		entity.meta.miredJumpSmall = Math.floor((miredRange / 100) * 10);
+		entity.meta.miredJumpLarge = Math.floor((miredRange / 100) * 30);
+	}
+
+	//If it's off we don't get brightness data, so set to zero
+	if (! entity.attributes.hasOwnProperty("brightness")) { entity.attributes.brightness = 0; }
+	//Turn brightness / 255 into a %
+	var brightnessPerc = Math.ceil((100 / 255) * parseInt(entity.attributes.brightness));
+
 	//for brightnessMenuActiveItem: 0 = brightness, 1 = temperature, 2 = colour
+
+	brightnessUI.activeEntity = entity;
+	console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+	console.log(JSON.stringify(brightnessUI.activeEntity))
+	console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 
 	wind_lightDetail = new UI.Window({
 		status: {
@@ -631,15 +709,7 @@ function showLightDetailWindow(entity) {
 		size: new Vector(144,168)
 	});
 
-	var bgp = calcBrightnessRectPosition(brightnessPerc);
-	console.log(JSON.stringify(bgp));
-	brightnessUI.brightnessRect = new UI.Rect({
-		backgroundColor: Feature.color(colour.highlight, "#AAAAAA"),
-		position: new Vector(bgp.x, bgp.y),
-		size: new Vector(bgp.w, bgp.h)
-	});
-
-	var title = "Wills Office"
+	var title = entity.attributes.friendly_name
 	var titleFont = "gothic_24_bold"
 	if (title.length > 17) { titleFont = "gothic_14_bold" }
 	var lightName = new UI.Text({
@@ -662,11 +732,11 @@ function showLightDetailWindow(entity) {
 		});
 	}
 
-	brightnessUI.lblpercentage = new UI.Text({
-		text: "75%",
+	brightnessUI.lblSelectedState = new UI.Text({
+		text: "0",
 		color: "Black",
-		font: "gothic_14_bold",
-		position: new Vector(6,32),
+		font: "gothic_24_bold",
+		position: new Vector(6,25),
 		size: new Vector(139,30)
 	});
 
@@ -689,7 +759,7 @@ function showLightDetailWindow(entity) {
   	position: new Vector(15, 80),
   	position2: new Vector(140, 80),
   	strokeColor: lineColour[0],
-		strokeWidth: 2
+		strokeWidth: 4
 	});
 	brightnessUI.tick_brightness = new UI.Image({
 		position: new Vector(62, 74),
@@ -706,7 +776,6 @@ function showLightDetailWindow(entity) {
 	 	image: "IMAGE_MICRO_BRIGHTNESS"
 	});
 
-
 	var tempLineColours = {
 		0: "#00AAFF",
 		1: "#00FFFF",
@@ -714,8 +783,8 @@ function showLightDetailWindow(entity) {
 		3: "#FFFFFF",
 		4: "#FFFFAA",
 		5: "#FFFF55",
-		6: "#FFAA55",
-		7: "#FFAA00",
+		6: "#FFFF00",
+		7: "#FFAA55",
 	}
 	var tempX = 15
 	for (var i = 0; i < 8; i++) {
@@ -726,7 +795,7 @@ function showLightDetailWindow(entity) {
 			position: new Vector(tempX, 100),
 			position2: new Vector(tempX + 15.625, 100),
 			strokeColor: lc,
-			strokeWidth: 2
+			strokeWidth: 4
 		});
 
 		tempX += 15.625;
@@ -746,40 +815,12 @@ function showLightDetailWindow(entity) {
 	  backgroundColor: 'transparent',
 	 	image: "IMAGE_MICRO_TEMP"
 	});
+	brightnessUI.hide_temperature = new UI.Rect({
+		backgroundColor: "white",
+		position: new Vector(0,90),
+		size: new Vector(144,20)
+	});
 
-	// brightnessUI.active_ticker = new UI.Image({
-	// 	position: new Vector(62, 74),
-	// 	size: new Vector(9,6),
-	// 	compositing: "set",
-	// 	backgroundColor: 'transparent',
-	// 	image: "IMAGE_MICRO_TICK_ACTIVE"
-	// })
-
-
-	// brightnessUI.opt_brightness = new UI.Text({
-	// 	text: "> Change Brightness",
-	// 	color: "Black",
-	// 	font: "gothic_14_bold",
-	// 	position: new Vector(5,55),
-	// 	size: new Vector(139,30)
-	// });
-	//
-	// brightnessUI.opt_temperature = new UI.Text({
-	// 	text: "   Change Temperature",
-	// 	color: "Black",
-	// 	font: "gothic_14",
-	// 	position: new Vector(5,75),
-	// 	size: new Vector(139,30)
-	// });
-	//
-	// brightnessUI.opt_colour = new UI.Text({
-	// 	text: "   Change Colour",
-	// 	color: "Black",
-	// 	font: "gothic_14",
-	// 	position: new Vector(5,95),
-	// 	size: new Vector(139,30)
-	// });
-	//
 	brightnessUI.ux_explain = new UI.Text({
 		text: "(Press select to cycle)",
 		color: "Black",
@@ -789,10 +830,9 @@ function showLightDetailWindow(entity) {
 	});
 
 	wind_lightDetail.add(windowBg);
-	// wind_lightDetail.add(brightnessUI.brightnessRect);
 	if (config.enableIcons) { wind_lightDetail.add(brightnessUI.icon); }
 	wind_lightDetail.add(lightName);
-	wind_lightDetail.add(brightnessUI.lblpercentage);
+	wind_lightDetail.add(brightnessUI.lblSelectedState);
 	wind_lightDetail.add(brightnessUI.line_brightness);
 	wind_lightDetail.add(brightnessUI.tick_brightness);
 	wind_lightDetail.add(brightnessUI.icon_brightness);
@@ -801,28 +841,30 @@ function showLightDetailWindow(entity) {
 	}
 	wind_lightDetail.add(brightnessUI.tick_temperature);
 	wind_lightDetail.add(brightnessUI.icon_temperature);
-	// wind_lightDetail.add(brightnessUI.opt_brightness);
-	// wind_lightDetail.add(brightnessUI.opt_temperature);
-	// wind_lightDetail.add(brightnessUI.opt_colour);
+	wind_lightDetail.add(brightnessUI.hide_temperature);
 	if (config.ux.hasChangedLightOperationsBefore == false) { wind_lightDetail.add(brightnessUI.ux_explain) }
 	// wind_lightDetail.add(brightnessUI.active_ticker);
 	wind_lightDetail.show();
-	refreshLightDetailUI(entity);
 
+	//Get fresh data
+	hass.refresh(entity, refreshLightDetailUI);
+
+	//Setup keybindings
 	wind_lightDetail.on('click', 'up', function() {
   	if (brightnessMenuActiveItem == 0) {
 			//Affecting brightness
+
+			var brightnessPerc = Math.ceil((100 / 255) * parseInt(brightnessUI.activeEntity.attributes.brightness));
 			brightnessPerc += 20;
 			if (brightnessPerc > 100) { brightnessPerc = 100 }
 			updateBrightness(entity, brightnessPerc);
 
 		} else if (brightnessMenuActiveItem == 1) {
 			//Affecting colour temp
-			var ct = entity.attributes.color_temp
-			ct += 30;
-			console.log("CT: " + ct)
-			console.log("Mmr: " + entity.attributes.max_mireds)
-			if (ct > entity.attributes.max_mireds) { ct = entity.attributes.max_mireds }
+
+			var ct = brightnessUI.activeEntity.attributes.color_temp
+			ct += brightnessUI.activeEntity.meta.miredJumpSmall;
+			if (ct > brightnessUI.activeEntity.attributes.max_mireds) { ct = brightnessUI.activeEntity.attributes.max_mireds }
 			updateTemperature(entity, ct);
 
 		}
@@ -830,47 +872,65 @@ function showLightDetailWindow(entity) {
 	wind_lightDetail.on('longClick', 'up', function() {
   	if (brightnessMenuActiveItem == 0) {
 			//Affecting brightness
+			var brightnessPerc = Math.ceil((100 / 255) * parseInt(brightnessUI.activeEntity.attributes.brightness));
 			brightnessPerc += 50;
 			if (brightnessPerc > 100) { brightnessPerc = 100 }
 			updateBrightness(entity, brightnessPerc);
 		} else if (brightnessMenuActiveItem == 1) {
-			var ct = entity.attributes.color_temp
-			ct += 40;
-			if (ct > entity.attributes.max_mireds) { ct = entity.attributes.max_mireds }
+			var ct = brightnessUI.activeEntity.attributes.color_temp
+			ct += brightnessUI.activeEntity.meta.miredJumpLarge;
+			if (ct > brightnessUI.activeEntity.attributes.max_mireds) { ct = brightnessUI.activeEntity.attributes.max_mireds }
 			updateTemperature(entity, ct);
 		}
 	});
 
 	wind_lightDetail.on('click', 'down', function() {
+
   	if (brightnessMenuActiveItem == 0) {
 			//Affecting brightness
+
+			var brightnessPerc = Math.ceil((100 / 255) * parseInt(brightnessUI.activeEntity.attributes.brightness));
 			brightnessPerc -= 20;
 			if (brightnessPerc < 0) { brightnessPerc = 0 }
 			updateBrightness(entity, brightnessPerc);
+
 		} else if (brightnessMenuActiveItem == 1) {
-			var ct = entity.attributes.color_temp
-			ct -= 20;
-			if (ct < entity.attributes.min_mireds) { ct = entity.attributes.min_mireds }
+
+			console.log("1")
+			var ct = brightnessUI.activeEntity.attributes.color_temp
+			console.log("2. CT: " + ct)
+			console.log("3. mjs: " + brightnessUI.activeEntity.meta.miredJumpSmall)
+			ct -= brightnessUI.activeEntity.meta.miredJumpSmall;
+			console.log("4")
+			if (ct < brightnessUI.activeEntity.attributes.min_mireds) { ct = brightnessUI.activeEntity.attributes.min_mireds }
+			console.log("5")
 			updateTemperature(entity, ct);
+
 		}
 	});
 	wind_lightDetail.on('longClick', 'down', function() {
+
   	if (brightnessMenuActiveItem == 0) {
 			//Affecting brightness
+
+			var brightnessPerc = Math.ceil((100 / 255) * parseInt(brightnessUI.activeEntity.attributes.brightness));
 			brightnessPerc -= 50;
 			if (brightnessPerc < 0) { brightnessPerc = 0 }
 			updateBrightness(entity, brightnessPerc);
+
 		} else if (brightnessMenuActiveItem == 1) {
-			var ct = entity.attributes.color_temp
-			ct -= 40;
-			if (ct < entity.attributes.min_mireds) { ct = entity.attributes.min_mireds }
+
+			var ct = brightnessUI.activeEntity.attributes.color_temp
+			ct -= brightnessUI.activeEntity.meta.miredJumpLarge;
+			if (ct < brightnessUI.activeEntity.attributes.min_mireds) { ct = brightnessUI.activeEntity.attributes.min_mireds }
 			updateTemperature(entity, ct);
+
 		}
 	});
 
 	wind_lightDetail.on('click', 'select', function() {
   	brightnessMenuActiveItem += 1;
-		if (entity.meta.supportsTemperature == false && brightnessMenuActiveItem > 0) { brightnessMenuActiveItem = 0}
+		if (entity.meta.supportsTemperature == false && brightnessMenuActiveItem > 0) { brightnessMenuActiveItem = 2}
 		if (entity.meta.supportsRGB == false && brightnessMenuActiveItem > 1) { brightnessMenuActiveItem = 0}
 		if (brightnessMenuActiveItem > 2) { brightnessMenuActiveItem = 0 }
 		if (config.ux.hasChangedLightOperationsBefore == false) {
@@ -879,7 +939,12 @@ function showLightDetailWindow(entity) {
 				position: new Vector(15,170)
 			}, 1000)
 		}
-		refreshLightDetailUI(entity);
+		hass.refresh(entity, refreshLightDetailUI);
+	});
+	wind_lightDetail.on('click', 'back', function(){
+		console.log("Back button pressed. Refresh selected entity");
+		hass.refresh(entity, updateMainMenuEntity);
+		wind_lightDetail.hide();
 	});
 }
 

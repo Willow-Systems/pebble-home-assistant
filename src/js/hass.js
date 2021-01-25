@@ -40,13 +40,15 @@ function makePostRequest(path, data, cb) {
   console.log("[hass] Posting '" + JSON.stringify(data) + "' to " + path)
   ajax({url: _url() + "/api" + path, type: 'json', headers: headers, data: data, method: "post"}, cb, genericNetworkFail);
 }
-function genericNetworkFail() {
+function genericNetworkFail(e) {
   var ohno = new UI.Card({
     title: 'Uh Oh',
     body: 'Failed to talk to Home Assistant',
     style: "small",
     scrollable: false
   });
+  console.log("oh no occured")
+  console.log(e)
   ohno.show();
 }
 
@@ -61,6 +63,14 @@ function setLightBrightness(entity, brightness, cb) {
     brightness: brightness
   }
   console.log("Making post request to brightness up");
+  makePostRequest("/services/light/turn_on", postData, cb)
+}
+function setLightTemperature(entity, temp, cb) {
+  var postData = {
+    entity_id: entity.entity_id,
+    color_temp: temp
+  }
+  console.log("Making post request to change temp");
   makePostRequest("/services/light/turn_on", postData, cb)
 }
 
@@ -98,3 +108,4 @@ module.exports.getStates = getStates;
 module.exports.toggle = toggle;
 module.exports.refresh = refresh;
 module.exports.setLightBrightness = setLightBrightness;
+module.exports.setLightTemperature = setLightTemperature;
