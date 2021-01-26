@@ -99,6 +99,11 @@
         "type": "png"
       },
       {
+        "file": "images/micro_tick_chalk.png",
+        "name": "IMAGE_MICRO_TICK_CHALK",
+        "type": "png"
+      },
+      {
         "file": "images/icon_unknown.png",
         "name": "IMAGE_ICON_UNKNOWN",
         "type": "png"
@@ -108,7 +113,9 @@
   "sdkVersion": "3",
   "shortName": "Hass.io",
   "targetPlatforms": [
-    "basalt"
+    "basalt",
+    "chalk",
+    "diorite"
   ],
   "uuid": "e72aed38-ceda-412b-bb20-3f606494cd1a",
   "versionCode": 1,

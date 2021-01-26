@@ -44,7 +44,7 @@ var sensorConfig = {
 }
 
 var colour = {
-	highlight: Feature.color("#00AAFF","#AAAAAA")
+	highlight: Feature.color("#00AAFF","#000000")
 }
 
 
@@ -93,15 +93,14 @@ function getEntityClass(entity_id) {
   //     "friendly_name": "Wills Office",
   //     "supported_features": 41,
 	// 		"max_mireds": 500,
-	// 		"min_mireds": 153,
-	// 		"color_temp": 326
+	// 		"min_mireds": 153
   //   },
   //   "context": {
   //     "id": "7d71eeccfb694746a658acf3a1b63776",
   //     "parent_id": null,
   //     "user_id": null
   //   },
-  //   "entity_id": "light.wills_office",
+  //   "entity_id": "light.lounge_l",
   //   "last_changed": "2021-01-23T10:13:49.081544+00:00",
   //   "last_updated": "2021-01-23T10:13:49.081544+00:00",
   //   "state": "on"
@@ -238,6 +237,7 @@ function renderStatesMenu(data, filter) {
 				console.log(JSON.stringify(entity))
 			}
 
+			if (entity.state == "unavailable") { icon = "IMAGE_ICON_UNAVAILABLE" }
 
 			if (filter == "sensor" && sensorConfig.invertSubtitle) {
 				title = subtitle
@@ -579,20 +579,34 @@ function refreshLightDetailUI(state) {
 
 	state.meta = {}
 	state.meta.supportsRGB = state.attributes.hasOwnProperty("rgb_color");
-	state.meta.supportsTemperature = (state.attributes.hasOwnProperty("max_mireds") && state.attributes.hasOwnProperty("color_temp"));
+	state.meta.supportsTemperature = state.attributes.hasOwnProperty("max_mireds");
+
+	if (state.state == "unavailable") {
+		console.log("Entity unavailable")
+		state.meta.supportsRGB = false;
+		state.meta.supportsTemperature = false;
+		state.brightness = 0;
+		bri_perc = 0;
+		if (config.enableIcons) {
+			brightnessUI.icon.image("IMAGE_ICON_UNAVAILABLE");
+		}
+	} else if (config.enableIcons && state.state == "on") {
+		brightnessUI.icon.image("IMAGE_ICON_BULB_ON");
+	} else {
+		brightnessUI.icon.image("IMAGE_ICON_BULB");
+	}
 
 	//The mired range can be huge, we need to calculate 10% for shortclick, 30% for longclick
 	if (state.meta.supportsTemperature) {
-		console.log("-=-=-=-=-=-=-=-=-=-=-")
 		var miredRange = state.attributes.max_mireds - state.attributes.min_mireds
 		state.meta.miredJumpSmall = Math.floor((miredRange / 100) * 10);
 		state.meta.miredJumpLarge = Math.floor((miredRange / 100) * 30);
 	}
 
-	// //Although lights that support temp always return min/max temp, they don't always return the current temp. Set to 50% space if so.
-	// if (state.meta.supportsTemperature && ! state.attributes.hasOwnProperty("color_temp")) {
-	// 	state.attributes.color_temp = state.attributes.max_mireds - ((state.attributes.max_mireds - state.attributes.min_mireds) / 2)
-	// }
+	//Although lights that support temp always return min/max temp, they don't always return the current temp. Set to 50% space if so.
+	if (state.state == "on" && state.meta.supportsTemperature && ! state.attributes.hasOwnProperty("color_temp")) {
+		state.attributes.color_temp = state.attributes.max_mireds - ((state.attributes.max_mireds - state.attributes.min_mireds) / 2)
+	}
 
 	var indicator = {
 		0: "IMAGE_MICRO_TICK",
@@ -608,9 +622,43 @@ function refreshLightDetailUI(state) {
 	}
 	lineColour[brightnessMenuActiveItem] = Feature.color(colour.highlight, "black")
 
-	//Line colours
-	brightnessUI.line_brightness.strokeColor(lineColour[0]);
-	var tempLineColours = {
+	if (Feature.round()) {
+		//Radials
+		if (brightnessMenuActiveItem == 0) {
+			brightnessUI.radial_brightness.angle2(percentageToRadialAngle(bri_perc))
+			brightnessUI.radial_brightness.backgroundColor(colour.highlight)
+		} else if (brightnessMenuActiveItem == 1) {
+			var tempLineColours = {
+				0: "#00AAFF",
+				1: "#00AAFF",
+				2: "#00FFFF",
+				3: "#AAFFFF",
+				4: "#FFFFAA",
+				5: "#FFFF55",
+				6: "#FFFF00",
+				7: "#FFAA55"
+			}
+			var cSpaceW = state.attributes.max_mireds - state.attributes.min_mireds
+			var percentageThroughSpace = ((state.attributes.color_temp - state.attributes.min_mireds) / cSpaceW) * 100;
+			var bgColorPosition = Math.round(percentageThroughSpace * 0.07)
+
+			brightnessUI.radial_brightness.angle2(percentageToRadialAngle(percentageThroughSpace))
+			brightnessUI.radial_brightness.backgroundColor(tempLineColours[bgColorPosition])
+		}
+
+		if (state.meta.supportsTemperature) {
+			//Unhide control if hidden
+			brightnessUI.hide_temperature.backgroundColor("transparent");
+			brightnessUI.tick_brightness.compositing("set");
+		} else {
+			//Hide temperature control. Entity doesn't support it
+			brightnessUI.hide_temperature.backgroundColor("white");
+			brightnessUI.tick_brightness.compositing("clear");
+		}
+	} else {
+		//Line colours
+		brightnessUI.line_brightness.strokeColor(lineColour[0]);
+		var tempLineColours = {
 		0: "#00AAFF",
 		1: "#00FFFF",
 		2: "#AAFFFF",
@@ -620,48 +668,53 @@ function refreshLightDetailUI(state) {
 		6: "#FFFF00",
 		7: "#FFAA55",
 	}
-	var tempX = 15
-	for (var i = 0; i < 8; i++) {
+		var tempX = 15
+		for (var i = 0; i < 8; i++) {
 		var lc = "black"
 		if (brightnessMenuActiveItem == 1) { lc = Feature.color(tempLineColours[i], "black")	}
 		brightnessUI["line_temperature_" + i].strokeColor(lc)
 	}
 
-	//Update ticks
-	brightnessUI.tick_brightness.image(indicator[0])
-	brightnessUI.tick_temperature.image(indicator[1])
+		//Update ticks
+		brightnessUI.tick_brightness.image(indicator[0])
+		brightnessUI.tick_temperature.image(indicator[1])
 
-	//Calc position for slider for brightness
-	var tickLeft = 10 + ((125 / 100) * bri_perc);
-	brightnessUI.tick_brightness.animate({position: new Vector(tickLeft,74)})
+		//Calc position for slider for brightness
+		var tickLeft = 10 + ((125 / 100) * bri_perc);
+		brightnessUI.tick_brightness.animate({position: new Vector(tickLeft,74)})
 
-	if (state.meta.supportsTemperature) {
-		//Unhide control if hidden
-		brightnessUI.hide_temperature.backgroundColor("transparent");
-		//Calc ticker position for colour temp
-		var tickWidth = state.attributes.max_mireds - state.attributes.min_mireds
-		// console.log("Calc colourtemp left. Colour space with is " + tickWidth)
-		tickLeft = ((state.attributes.color_temp - state.attributes.min_mireds) / tickWidth) * 100;
-		// console.log("Therefore, % of color space for " + state.attributes.color_temp + " is " + tickLeft)
-		tickLeft = 10 + ((125 / 100) * tickLeft);
-		// console.log("Therefore, absolute left is " + tickLeft)
-		brightnessUI.tick_temperature.animate({position: new Vector(tickLeft,94)})
-	} else {
-		//Hide temperature control. Entity doesn't support it
-		brightnessUI.hide_temperature.backgroundColor("white");
+		if (state.meta.supportsTemperature) {
+			//Unhide control if hidden
+			brightnessUI.hide_temperature.backgroundColor("transparent");
+			//Calc ticker position for colour temp
+			var tickWidth = state.attributes.max_mireds - state.attributes.min_mireds
+			// console.log("Calc colourtemp left. Colour space with is " + tickWidth)
+			tickLeft = ((state.attributes.color_temp - state.attributes.min_mireds) / tickWidth) * 100;
+			// console.log("Therefore, % of color space for " + state.attributes.color_temp + " is " + tickLeft)
+			tickLeft = 10 + ((125 / 100) * tickLeft);
+			// console.log("Therefore, absolute left is " + tickLeft)
+			brightnessUI.tick_temperature.animate({position: new Vector(tickLeft,94)})
+		} else {
+			//Hide temperature control. Entity doesn't support it
+			brightnessUI.hide_temperature.backgroundColor("white");
+		}
+
 	}
 
-
 	if (brightnessMenuActiveItem == 0) {
-		if (bri_perc < 1) {
+		if (state.state == "unavailable") {
+			brightnessUI.lblSelectedState.text("Unavailable");
+		} else if (bri_perc < 1 || state.state == "off") {
 			brightnessUI.lblSelectedState.text("Off");
 		} else {
 			brightnessUI.lblSelectedState.text(bri_perc + "%");
 		}
+		if (Feature.round()) { brightnessUI.tick_brightness.animate({position: new Vector(70,147)})	}
 	} else if (brightnessMenuActiveItem == 1) {
 		//mireds to kelvin
 		var kelv = Math.ceil(1000000 / state.attributes.color_temp)
 		brightnessUI.lblSelectedState.text(kelv + "K");
+		if (Feature.round()) { brightnessUI.tick_brightness.animate({position: new Vector(102,147)})	}
 	}
 
 	brightnessUI.activeEntity = state
@@ -675,6 +728,12 @@ function showLightDetailWindow(entity) {
 	entity.meta = {}
 	entity.meta.supportsRGB = entity.attributes.hasOwnProperty("rgb_color");
 	entity.meta.supportsTemperature = entity.attributes.hasOwnProperty("max_mireds");
+
+	if (entity.state == "unavailable") {
+		entity.meta.supportsRGB = false;
+		entity.meta.supportsTemperature = false;
+		entity.brightness = 0;
+	}
 
 	//The mired range can be huge, we need to calculate 10% for shortclick, 30% for longclick
 	if (entity.meta.supportsTemperature) {
@@ -691,16 +750,14 @@ function showLightDetailWindow(entity) {
 	//for brightnessMenuActiveItem: 0 = brightness, 1 = temperature, 2 = colour
 
 	brightnessUI.activeEntity = entity;
-	console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-	console.log(JSON.stringify(brightnessUI.activeEntity))
-	console.log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 
 	wind_lightDetail = new UI.Window({
-		status: {
+		status: Feature.round(false, {
 	    color: 'black',
     	backgroundColor: 'white',
 			seperator: "dotted"
-  	}
+  	}),
+		backgroundColor: "white"
 	});
 
 	var windowBg = new UI.Rect({
@@ -719,6 +776,11 @@ function showLightDetailWindow(entity) {
 		position: new Vector(5,3),
 		size: new Vector(139,30)
 	});
+	if (Feature.round()) {
+		lightName.position(new Vector(10, 75));
+		lightName.size(new Vector(160,30));
+		lightName.textAlign("center")
+	}
 
 	if (config.enableIcons) {
 		var y = 8;
@@ -730,6 +792,7 @@ function showLightDetailWindow(entity) {
     	backgroundColor: 'transparent',
   		image: "IMAGE_ICON_BULB"
 		});
+		if (Feature.round()) { brightnessUI.icon.position(new Vector(77.5, 50))	}
 	}
 
 	brightnessUI.lblSelectedState = new UI.Text({
@@ -739,6 +802,12 @@ function showLightDetailWindow(entity) {
 		position: new Vector(6,25),
 		size: new Vector(139,30)
 	});
+	if (Feature.round()) {
+		brightnessUI.lblSelectedState.position(new Vector(10, 100))
+		brightnessUI.lblSelectedState.size(new Vector(160,30));
+		brightnessUI.lblSelectedState.textAlign("center")
+	}
+
 
 	var indicator = {
 		0: "IMAGE_MICRO_TICK",
@@ -755,28 +824,46 @@ function showLightDetailWindow(entity) {
 	lineColour[brightnessMenuActiveItem] = Feature.color(colour.highlight, "black")
 
 
-	brightnessUI.line_brightness = new UI.Line({
-  	position: new Vector(15, 80),
-  	position2: new Vector(140, 80),
-  	strokeColor: lineColour[0],
-		strokeWidth: 4
-	});
-	brightnessUI.tick_brightness = new UI.Image({
-		position: new Vector(62, 74),
-	 	size: new Vector(9,5),
-		compositing: "set",
-	  backgroundColor: 'transparent',
-	 	image: indicator[0]
-	});
-	brightnessUI.icon_brightness = new UI.Image({
-		position: new Vector(2, 75),
-	 	size: new Vector(10,10),
-		compositing: "set",
-	  backgroundColor: 'transparent',
-	 	image: "IMAGE_MICRO_BRIGHTNESS"
-	});
+	if (Feature.round()) {
+		brightnessUI.radial_brightness = new UI.Radial({
+  		position: new Vector(10,10),
+  		radius: 5,
+			angle: -120,
+			angle2: 120,
+			// borderColor: 'red',
+			// borderWidth: 4,
+			backgroundColor: colour.highlight,
+			color: 'black',
+			size: new Vector(160,160)
+		});
+		brightnessUI.tick_brightness = new UI.Image({
+			position: new Vector(70, 147),
+			size: new Vector(9,5),
+			compositing: "set",
+			backgroundColor: 'transparent',
+			image: "IMAGE_MICRO_TICK_CHALK"
+		});
+	} else {
+		brightnessUI.line_brightness = new UI.Line({
+			position: new Vector(15, 80),
+			position2: new Vector(140, 80),
+			strokeColor: lineColour[0],
+			strokeWidth: 6
+		});
+		brightnessUI.tick_brightness = new UI.Image({
+			position: new Vector(62, 74),
+			size: new Vector(9,5),
+			compositing: "set",
+			backgroundColor: 'transparent',
+			image: indicator[0]
+		});
+	}
 
-	var tempLineColours = {
+	if (Feature.round()) {
+
+	} else {
+
+		var tempLineColours = {
 		0: "#00AAFF",
 		1: "#00FFFF",
 		2: "#AAFFFF",
@@ -786,8 +873,8 @@ function showLightDetailWindow(entity) {
 		6: "#FFFF00",
 		7: "#FFAA55",
 	}
-	var tempX = 15
-	for (var i = 0; i < 8; i++) {
+		var tempX = 15
+		for (var i = 0; i < 8; i++) {
 		var lc = "black"
 		if (brightnessMenuActiveItem == 1) { lc = Feature.color(tempLineColours[i], "black") }
 
@@ -795,55 +882,72 @@ function showLightDetailWindow(entity) {
 			position: new Vector(tempX, 100),
 			position2: new Vector(tempX + 15.625, 100),
 			strokeColor: lc,
-			strokeWidth: 4
+			strokeWidth: 6
 		});
 
 		tempX += 15.625;
 	}
 
-	brightnessUI.tick_temperature = new UI.Image({
+		brightnessUI.tick_temperature = new UI.Image({
 		position: new Vector(62, 94),
 	 	size: new Vector(9,5),
 		compositing: "set",
 	  backgroundColor: 'transparent',
 	 	image: indicator[1]
 	});
+
+	}
+
+	brightnessUI.icon_brightness = new UI.Image({
+			position: Feature.round(new Vector(70,135), new Vector(2, 75)),
+			size: new Vector(10,10),
+			compositing: "set",
+			backgroundColor: 'transparent',
+			image: "IMAGE_MICRO_BRIGHTNESS"
+		});
 	brightnessUI.icon_temperature = new UI.Image({
-		position: new Vector(2, 95),
+		position: Feature.round(new Vector(100,135), new Vector(2, 95)),
 	 	size: new Vector(10,10),
 		compositing: "set",
 	  backgroundColor: 'transparent',
 	 	image: "IMAGE_MICRO_TEMP"
 	});
 	brightnessUI.hide_temperature = new UI.Rect({
-		backgroundColor: "white",
-		position: new Vector(0,90),
-		size: new Vector(144,20)
+		position: Feature.round(new Vector(60,125), new Vector(0,90)),
+		size: Feature.round(new Vector(52,22),new Vector(144,20))
 	});
 
 	brightnessUI.ux_explain = new UI.Text({
-		text: "(Press select to cycle)",
+		text: Feature.round("(Select to cycle)","(Press select to cycle)"),
 		color: "Black",
 		font: "gothic_14",
-		position: new Vector(15,133),
-		size: new Vector(139,30)
+		position: Feature.round(new Vector(0, 150), new Vector(15,133)),
+		textAlign: Feature.round("center","left"),
+		size: new Vector(180,30)
 	});
 
-	wind_lightDetail.add(windowBg);
+	//Add to window
 	if (config.enableIcons) { wind_lightDetail.add(brightnessUI.icon); }
 	wind_lightDetail.add(lightName);
 	wind_lightDetail.add(brightnessUI.lblSelectedState);
-	wind_lightDetail.add(brightnessUI.line_brightness);
-	wind_lightDetail.add(brightnessUI.tick_brightness);
 	wind_lightDetail.add(brightnessUI.icon_brightness);
-	for (var i = 0; i < 8; i++) {
-		wind_lightDetail.add(brightnessUI["line_temperature_" + i]);
-	}
-	wind_lightDetail.add(brightnessUI.tick_temperature);
 	wind_lightDetail.add(brightnessUI.icon_temperature);
+	wind_lightDetail.add(brightnessUI.tick_brightness);
+
+	if (Feature.round()) {
+		wind_lightDetail.add(brightnessUI.radial_brightness);
+	} else {
+		wind_lightDetail.add(brightnessUI.line_brightness);
+		for (var i = 0; i < 8; i++) {
+			wind_lightDetail.add(brightnessUI["line_temperature_" + i]);
+		}
+		wind_lightDetail.add(brightnessUI.tick_temperature);
+	}
+
 	wind_lightDetail.add(brightnessUI.hide_temperature);
-	if (config.ux.hasChangedLightOperationsBefore == false) { wind_lightDetail.add(brightnessUI.ux_explain) }
-	// wind_lightDetail.add(brightnessUI.active_ticker);
+
+
+	if (config.ux.hasChangedLightOperationsBefore == false && (entity.meta.supportsTemperature)) { wind_lightDetail.add(brightnessUI.ux_explain) }
 	wind_lightDetail.show();
 
 	//Get fresh data
@@ -936,7 +1040,7 @@ function showLightDetailWindow(entity) {
 		if (config.ux.hasChangedLightOperationsBefore == false) {
 			config.ux.hasChangedLightOperationsBefore = true;
 			brightnessUI.ux_explain.animate({
-				position: new Vector(15,170)
+				position: new Vector(brightnessUI.ux_explain.position()[0],200)
 			}, 1000)
 		}
 		hass.refresh(entity, refreshLightDetailUI);
@@ -979,4 +1083,11 @@ function friendlyLastChanged(lc) {
 		if (out < 2) { units = "hour" }
 	}
 	return out + " " + units + " ago";
+}
+function percentageToRadialAngle(perc) {
+	const totalAngleWidth = 240
+	var angleWidth = (totalAngleWidth / 100) * perc
+	console.log("AW: " + angleWidth)
+	if (angleWidth < 2) { angleWidth = 2 }
+	return (-120 + angleWidth)
 }
