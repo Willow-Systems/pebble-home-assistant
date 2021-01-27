@@ -71,7 +71,7 @@ itemIndex = 0;
 brightnessMenuActiveItem = 0;
 brightnessUI = {};
 
-//Find a better solution to this PLEASE
+//Hacky callback stuff we can do because it's a watch
 brightnessUpEntityID = null;
 
 var wayBack = {
@@ -87,6 +87,7 @@ function getEntityClass(entity_id) {
 //Pebble.addEventListener('ready', function() {
 	console.log("Lets Go!");
 	go();
+
 	// showLightDetailWindow({
   //   "attributes": {
 	// 		"brightness": "150",
@@ -105,6 +106,8 @@ function getEntityClass(entity_id) {
   //   "last_updated": "2021-01-23T10:13:49.081544+00:00",
   //   "state": "on"
   // });
+
+	// showSensorDetailWindow("Test Sensor Long","100","IMAGE_ICON_SENSOR","ExtraEntry: ExtraValue");
 
 
 function go() {
@@ -470,12 +473,8 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData) {
 	    color: 'black',
     	backgroundColor: 'white',
 			seperator: "dotted"
-  	}
-	});
-	var windowBg = new UI.Rect({
-		backgroundColor: "white",
-		position: new Vector(0,0),
-		size: new Vector(144,168)
+  	},
+		backgroundColor: "white"
 	});
 
 	var titleFont = "gothic_24_bold"
@@ -484,8 +483,9 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData) {
 		text: _title,
 		color: Feature.color(colour.highlight, "black"),
 		font: titleFont,
-		position: new Vector(5,3),
-		size: new Vector(139,30)
+		position: Feature.round(new Vector(10,3), new Vector(5,3)),
+		size: Feature.round(new Vector(160,30), new Vector(139,30)),
+		textAlign: Feature.round("center","left")
 	});
 
 	if (config.enableIcons) {
@@ -503,9 +503,10 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData) {
 	var sensorValue = new UI.Text({
 		text: _value,
 		color: "black",
-		font: "gothic_18_bold",
-		position: new Vector(5,30),
-		size: new Vector(100,25)
+		font: Feature.round("gothic_24_bold","gothic_18_bold"),
+		position: Feature.round(new Vector(10,29), new Vector(5,30)),
+		size: Feature.round(new Vector(160,25), new Vector(100,25)),
+		textAlign: Feature.round("center","left")
 	});
 
 	if (_extraData != null && _extraData != "") {
@@ -513,13 +514,13 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData) {
 			text: _extraData,
 			color: "black",
 			font: "gothic_14",
-			position: new Vector(5,60),
-			size: new Vector(139,100)
+			position: Feature.round(new Vector(10, 65), new Vector(5,60)),
+			size: Feature.round(new Vector(160,100), new Vector(139,100)),
+			textAlign: Feature.round("center","left")
 		});
 	}
 
-	wind_sensorDetail.add(windowBg);
-	if (config.enableIcons) { wind_sensorDetail.add(sensorIcon); }
+	if (config.enableIcons && Feature.rectangle()) { wind_sensorDetail.add(sensorIcon); }
 	if (_extraData != null && _extraData != "") { wind_sensorDetail.add(sensorExtraDeets); }
 	wind_sensorDetail.add(sensorValue);
 	wind_sensorDetail.add(sensorName);
@@ -570,16 +571,17 @@ function updateTemperature(entity, colorTemp) {
 	// refreshLightDetailUI(entity)
 }
 function refreshLightDetailUI(state) {
+	console.log("Refresh UI based on state: " + JSON.stringify(state))
+
 	if (! state.attributes.hasOwnProperty("brightness")) { state.attributes.brightness = 0; }
 
-	console.log("Refresh UI based on state: " + JSON.stringify(state))
 
 	//Turn absolute brightness back into %
 	var bri_perc = Math.ceil((100 / 255) * parseInt(state.attributes.brightness));
 
 	state.meta = {}
 	state.meta.supportsRGB = state.attributes.hasOwnProperty("rgb_color");
-	state.meta.supportsTemperature = state.attributes.hasOwnProperty("max_mireds");
+	state.meta.supportsTemperature = (state.state == "on" && state.attributes.hasOwnProperty("max_mireds"));
 
 	if (state.state == "unavailable") {
 		console.log("Entity unavailable")
@@ -727,7 +729,7 @@ function showLightDetailWindow(entity) {
 
 	entity.meta = {}
 	entity.meta.supportsRGB = entity.attributes.hasOwnProperty("rgb_color");
-	entity.meta.supportsTemperature = entity.attributes.hasOwnProperty("max_mireds");
+	entity.meta.supportsTemperature = (entity.state == "on" && entity.attributes.hasOwnProperty("max_mireds"));
 
 	if (entity.state == "unavailable") {
 		entity.meta.supportsRGB = false;
@@ -1034,10 +1036,10 @@ function showLightDetailWindow(entity) {
 
 	wind_lightDetail.on('click', 'select', function() {
   	brightnessMenuActiveItem += 1;
-		if (entity.meta.supportsTemperature == false && brightnessMenuActiveItem > 0) { brightnessMenuActiveItem = 2}
-		if (entity.meta.supportsRGB == false && brightnessMenuActiveItem > 1) { brightnessMenuActiveItem = 0}
+		if (brightnessUI.activeEntity.meta.supportsTemperature == false && brightnessMenuActiveItem > 0) { brightnessMenuActiveItem = 2}
+		if (brightnessUI.activeEntity.meta.supportsRGB == false && brightnessMenuActiveItem > 1) { brightnessMenuActiveItem = 0}
 		if (brightnessMenuActiveItem > 2) { brightnessMenuActiveItem = 0 }
-		if (config.ux.hasChangedLightOperationsBefore == false) {
+		if (config.ux.hasChangedLightOperationsBefore == false && brightnessUI.activeEntity.meta.supportsTemperature) {
 			config.ux.hasChangedLightOperationsBefore = true;
 			brightnessUI.ux_explain.animate({
 				position: new Vector(brightnessUI.ux_explain.position()[0],200)
@@ -1045,8 +1047,25 @@ function showLightDetailWindow(entity) {
 		}
 		hass.refresh(entity, refreshLightDetailUI);
 	});
+	wind_lightDetail.on('longClick', 'select', function() {
+		wayBack.toggle = entity.entity_id
+		brightnessMenuActiveItem = 0;
+		hass.toggle(entity, function(entities) {
+			console.log("Toggle callback running");
+			//We get a list of entities back, find ours.
+			for (var i = 0; i < entities.length; i++) {
+				var entity = entities[i];
+				if (entity.entity_id == wayBack.toggle) {
+					refreshLightDetailUI(entity);
+					break;
+				}
+			}
+		})
+		//Hack);
+	});
 	wind_lightDetail.on('click', 'back', function(){
 		console.log("Back button pressed. Refresh selected entity");
+		brightnessMenuActiveItem = 0;
 		hass.refresh(entity, updateMainMenuEntity);
 		wind_lightDetail.hide();
 	});
