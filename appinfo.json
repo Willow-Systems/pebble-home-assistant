@@ -74,6 +74,16 @@
         "type": "png"
       },
       {
+        "file": "images/icon_blinds_open.png",
+        "name": "IMAGE_ICON_BLIND_OPEN",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_blinds_closed.png",
+        "name": "IMAGE_ICON_BLIND_CLOSED",
+        "type": "png"
+      },
+      {
         "file": "images/icon_unavailable.png",
         "name": "IMAGE_ICON_UNAVAILABLE",
         "type": "png"

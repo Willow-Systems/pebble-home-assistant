@@ -90,6 +90,8 @@ function toggle(entity, cb) {
     path = "/services/light/toggle"
   } else if (entity.type == "switch") {
     path = "/services/switch/toggle"
+  } else if (entity.type == "cover") {
+    path = "/services/cover/toggle"
   }
 
   makePostRequest(path, data, cb)

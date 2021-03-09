@@ -21,6 +21,7 @@ var config = {
 	showSensors: true,
 	showAutomations: false,
 	enableIcons: true,
+	hideUnavailable: true,
 	ux: {
 		hasChangedLightOperationsBefore: false
 	}
@@ -156,7 +157,11 @@ function renderStatesMenu(data, filter) {
 
 		//The almighty entity parser
 
-		if (entity.type.indexOf(filter) != -1 && entityBlacklist.indexOf(entity.entity_id) == -1) {
+		var entityType = entity.type;
+		//Treat covers as switches here
+		entityType = entityType.replace("cover","switch");
+
+		if (entityType.indexOf(filter) != -1 && entityBlacklist.indexOf(entity.entity_id) == -1 && (config.hideUnavailable == false || entity.state != "unavailable")) {
 
 			//White/Blacklist stuff
 			if (filter == "sensor") {
@@ -193,6 +198,11 @@ function renderStatesMenu(data, filter) {
 
 				icon = "IMAGE_ICON_SWITCH_OFF"
 				if (entity.state == "on") { icon = "IMAGE_ICON_SWITCH_ON" }
+				subtitle = entity.state
+			} else if (entity.type == "cover") {
+
+				icon = "IMAGE_ICON_BLIND_CLOSED"
+				if (entity.state == "open") { icon = "IMAGE_ICON_BLIND_OPEN" }
 				subtitle = entity.state
 
 			}	else if (entity.type == "sensor") {
@@ -277,7 +287,10 @@ function renderStatesMenu(data, filter) {
   	console.log('Short Pressed item #' + e.itemIndex + ' of section #' + e.sectionIndex);
 		console.log('Resolved to entity ID ' + menuPosToEntity[e.itemIndex].entity_id);
 		itemIndex = e.itemIndex
+		var originalSubtitle = e.item.subtitle
 		mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: '...' });
+
+		if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "cover") { filter = "cover" }
 
 		if (["light","switch"].indexOf(filter) != -1) {
 
@@ -285,14 +298,14 @@ function renderStatesMenu(data, filter) {
 
 				console.log("Got this back: " + JSON.stringify(data))
 				for (var i = 0; i < data.length; i++) {
-				var entity = data[i];
-				if (getEntityClass(entity.entity_id) != "group" && entity.entity_id == menuPosToEntity[e.itemIndex].entity_id) {
-					// && entity.entity_id == menuPosToEntity[e.itemIndex]
-					// console.log("Does " + entity.entity_id + " match " + menuPosToEntity[e.itemIndex].entity_id)
-					data = entity;
-					break;
+					var entity = data[i];
+					if (getEntityClass(entity.entity_id) != "group" && entity.entity_id == menuPosToEntity[e.itemIndex].entity_id) {
+						// && entity.entity_id == menuPosToEntity[e.itemIndex]
+						// console.log("Does " + entity.entity_id + " match " + menuPosToEntity[e.itemIndex].entity_id)
+						data = entity;
+						break;
+					}
 				}
-			}
 
 
 				var subtitle = data.state
@@ -309,9 +322,32 @@ function renderStatesMenu(data, filter) {
 				if (entity.state == "off") { icon = "IMAGE_ICON_BULB" }
 			}
 				if (getEntityClass(entity.entity_id) == "switch") {
-				if (entity.state == "on") { icon = "IMAGE_ICON_SWITCH_ON" }
-				if (entity.state == "off") { icon = "IMAGE_ICON_SWITCH_OFF" }
-			}
+					if (entity.state == "on") { icon = "IMAGE_ICON_SWITCH_ON" }
+					if (entity.state == "off") { icon = "IMAGE_ICON_SWITCH_OFF" }
+				}
+
+				var o = { title: e.item.title, subtitle: subtitle }
+				if (config.enableIcons) {	o.icon = icon	}
+				mainMenu.item(0, e.itemIndex, o);
+
+			}, e.itemIndex)
+
+		} else if (filter == "cover") {
+
+			//Cover returns nothing, so we have to fudge it
+			hass.toggle(menuPosToEntity[e.itemIndex], function(data, itemIndex) {
+				console.log("Special cover handler")
+				console.log("Got this back: " + JSON.stringify(data))
+
+				originalSubtitle = originalSubtitle.toLowerCase();
+
+				if (originalSubtitle == "open") {
+					var subtitle = "closed"
+				} else {
+					var subtitle = "open"
+				}
+				if (subtitle == "open") { icon = "IMAGE_ICON_BLIND_OPEN" }
+				if (subtitle == "closed") { icon = "IMAGE_ICON_BLIND_CLOSED" }
 
 				var o = { title: e.item.title, subtitle: subtitle }
 				if (config.enableIcons) {	o.icon = icon	}
@@ -367,14 +403,14 @@ function renderStatesMenu(data, filter) {
 	});
 
 	mainMenu.on('longSelect', function(e) {
-		if (filter == "sensor") {
+		if (["cover","sensor", "switch"].indexOf(filter) != -1) {
 			var s = menuPosToEntity[e.itemIndex];
 			console.log("Cached state: " + JSON.stringify(s))
 
 			//Get non-standard attributes to create the extra data field
 			var extraData = "";
 			var attrs = s.attributes;
-			var standardAttrs = ["friendly_name","icon","unit_of_measurement","device_class"];
+			var standardAttrs = ["friendly_name","icon","unit_of_measurement","device_class","supported_features"];
 			for (var key in attrs) {
 				var value = attrs[key];
 				console.log("Check k:" + key + "  v:" + value)
@@ -478,19 +514,23 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData) {
 	});
 
 	var titleFont = "gothic_24_bold"
-	if (_title.length > 17) { titleFont = "gothic_14_bold" }
+	var titleY = 3
+	if (_title.length > 17) {
+		titleFont = "gothic_14_bold"
+		titleY = 6
+	}
 	var sensorName = new UI.Text({
 		text: _title,
 		color: Feature.color(colour.highlight, "black"),
 		font: titleFont,
-		position: Feature.round(new Vector(10,3), new Vector(5,3)),
+		position: Feature.round(new Vector(10,titleY), new Vector(5,titleY)),
 		size: Feature.round(new Vector(160,30), new Vector(139,30)),
 		textAlign: Feature.round("center","left")
 	});
 
 	if (config.enableIcons) {
 		var y = 18;
-		if (_title.length > 11) { y = 33 }
+		if (_title.length > 10) { y = 33 }
 		var sensorIcon = new UI.Image({
   		position: new Vector(96, y),
   		size: new Vector(25,25),
