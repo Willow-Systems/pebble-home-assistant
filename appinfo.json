@@ -114,8 +114,38 @@
         "type": "png"
       },
       {
+        "file": "images/icon_media.png",
+        "name": "IMAGE_ICON_MEDIA",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_playpause.png",
+        "name": "IMAGE_ICON_PLAYPAUSE",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_volume_down.png",
+        "name": "IMAGE_ICON_VOLUME_DOWN",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_volume_up.png",
+        "name": "IMAGE_ICON_VOLUME_UP",
+        "type": "png"
+      },
+      {
         "file": "images/icon_unknown.png",
         "name": "IMAGE_ICON_UNKNOWN",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_unmuted.png",
+        "name": "IMAGE_ICON_UNMUTED",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_muted.png",
+        "name": "IMAGE_ICON_MUTED",
         "type": "png"
       }
     ]

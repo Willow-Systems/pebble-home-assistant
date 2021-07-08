@@ -78,6 +78,55 @@ function setLightTemperature(entity, temp, cb) {
     makePostRequest("/services/light/turn_on", postData, cb)
 }
 
+function playPause(entity, cb) {
+    console.log("[hass] Playpause device " + entity.entity_id)
+
+    var data = {
+        entity_id: entity.entity_id
+    };
+    var path = "/services/media_player/media_play_pause"
+
+    makePostRequest(path, data, cb)
+}
+
+function volume_up(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id
+    };
+    var path = "/services/media_player/volume_up"
+
+    makePostRequest(path, data, cb)
+}
+function volume_down(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id
+    };
+    var path = "/services/media_player/volume_down"
+
+    makePostRequest(path, data, cb)
+}
+function mute(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id,
+        is_volume_muted: true
+    };
+    var path = "/services/media_player/volume_mute"
+
+    makePostRequest(path, data, cb)
+}
+function unmute(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id,
+        is_volume_muted: false
+    };
+    var path = "/services/media_player/volume_mute"
+
+    makePostRequest(path, data, cb)
+}
+
+
+
+
 function toggle(entity, cb) {
 
     console.log("[hass] Toggle device " + entity.entity_id)
@@ -85,22 +134,11 @@ function toggle(entity, cb) {
     var data = {
         entity_id: entity.entity_id
     };
-    var path = ""
-
     entity.type = entity.entity_id.split(".")[0];
-
-    //Replace with map thanks
-    if (entity.type == "light") {
-        path = "/services/light/toggle"
-    } else if (entity.type == "switch") {
-        path = "/services/switch/toggle"
-    } else if (entity.type == "cover") {
-        path = "/services/cover/toggle"
-    } else if (entity.type == "input_boolean") {
-        path = "/services/input_boolean/toggle"
-    }
+    var path = "/services/" + entity.type + "/toggle"
 
     makePostRequest(path, data, cb)
+    cb()
 
 }
 
@@ -118,3 +156,8 @@ module.exports.toggle = toggle;
 module.exports.refresh = refresh;
 module.exports.setLightBrightness = setLightBrightness;
 module.exports.setLightTemperature = setLightTemperature;
+module.exports.playPause = playPause
+module.exports.volume_up = volume_up
+module.exports.volume_down = volume_down
+module.exports.mute = mute
+module.exports.unmute = unmute

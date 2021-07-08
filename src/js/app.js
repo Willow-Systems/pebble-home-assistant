@@ -7,6 +7,8 @@ var Feature = require('platform/feature');
 var Platform = require('platform');
 var hass = require('./hass.js');
 
+setSettingsToDefaultIfRequired();
+
 var entityTypeWhitelist = ["light"];
 var entityBlacklist = [
     "light.configuration_tool_1",
@@ -21,10 +23,11 @@ var entityBlacklist = [
 ];
 
 var config = {
-    showLights: true,
-    showSwitches: true,
-    showSensors: true,
-    showAutomations: false,
+    showLights: Settings.data("ui_show_lights"),
+    showSwitches: Settings.data('ui_show_switches'),
+    showSensors: Settings.data('ui_show_sensors'),
+    showAutomations: Settings.data('ui_show_automations'),
+    showMediaPlayers: Settings.data('ui_show_mediaplayers'),
     enableIcons: true,
     hideUnavailable: true,
     ux: {
@@ -44,13 +47,25 @@ var sensorConfig = {
         "sensor.multi_sensor_2",
         "binary_sensor.front_door",
         "binary_sensor.back_door",
-        "sensor.minecraft_server_players_online"
+        "sensor.minecraft_server_players_online",
+        "sensor.nextbintype"
     ],
     invertSubtitle: false
 }
 
 var colour = {
     highlight: Feature.color("#00AAFF", "#000000")
+}
+
+function setSettingsToDefaultIfRequired() {
+    console.log("Internal settings unset. Setting to default")
+    if (Settings.data('ui_show_lights') == null) {
+        Settings.data('ui_show_lights', true);
+        Settings.data('ui_show_switches', true);
+        Settings.data('ui_show_sensors', true);
+        Settings.data('ui_show_automations', false);
+        Settings.data('ui_show_mediaplayers', true);
+    }
 }
 
 
@@ -127,6 +142,7 @@ function go() {
     if (config.showLights) { homeItems.push({ title: "Lights" }) }
     if (config.showSwitches) { homeItems.push({ title: "Switches" }) }
     if (config.showSensors) { homeItems.push({ title: "Sensors" }) }
+    // if (config.showMediaPlayers) { homeItems.push({ title: "Media Players" }) }
     if (config.showAutomations) { homeItems.push({ title: "Automations" }) }
 
     homeMenu.section(0, {
@@ -140,6 +156,8 @@ function go() {
             hass.getStates(renderStatesMenu, "switch");
         } else if (e.item.title.toLowerCase() == "sensors") {
             hass.getStates(renderStatesMenu, "sensor");
+        } else if (e.item.title.toLowerCase() == "media players") {
+            hass.getStates(renderStatesMenu, "media_player");
         } else if (e.item.title.toLowerCase() == "automations") {
             hass.getStates(renderStatesMenu, "automation");
         }
@@ -153,8 +171,6 @@ function renderStatesMenu(data, filter) {
     menuPosToEntity = [];
     var menuItemArray = [];
 
-    // console.log(JSON.stringify(data))
-
     for (var i = 0; i < data.length; i++) {
 
         var entity = data[i];
@@ -166,6 +182,7 @@ function renderStatesMenu(data, filter) {
         //Treat covers as switches here
         entityType = entityType.replace("cover", "switch");
         entityType = entityType.replace("input_boolean", "switch")
+        entityType = entityType.replace("media_player", "switch")
 
         if (entityType.indexOf(filter) != -1 && entityBlacklist.indexOf(entity.entity_id) == -1 && (config.hideUnavailable == false || entity.state != "unavailable")) {
 
@@ -253,6 +270,19 @@ function renderStatesMenu(data, filter) {
                     "unavailable": "IMAGE_ICON_UNAVAILABLE"
                 }[entity.state]
 
+            } else if (entity.type == "media_player") {
+
+                subtitle = ""
+                if (title.length > 11) {
+                    title = entity.attributes.friendly_name.substr(0, 11)
+                    subtitle = entity.attributes.friendly_name.substr(11)
+                }
+                icon = {
+                    "on": "IMAGE_ICON_MEDIA",
+                    "off": "IMAGE_ICON_MEDIA",
+                    "unavailable": "IMAGE_ICON_UNAVAILABLE"
+                }[entity.state]
+
             } else {
                 console.log(JSON.stringify(entity))
             }
@@ -295,9 +325,18 @@ function renderStatesMenu(data, filter) {
         console.log('Resolved to entity ID ' + menuPosToEntity[e.itemIndex].entity_id);
         itemIndex = e.itemIndex
         var originalSubtitle = e.item.subtitle
-        mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: '...' });
 
+        //Entities to NOT replace subtitle with ... on click
+        var noElipsis = ["media_player"]
+        if (noElipsis.indexOf(getEntityClass(menuPosToEntity[e.itemIndex].entity_id)) == -1) {
+            mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: '...' });
+        }
+
+        //cover, input_boolean, media_player and switch all have filter=switch. Now we need cover to be 'cover' again
+        //input_boolean stays as 'switch'
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "cover") { filter = "cover" }
+        if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "media_player") { filter = "media_player" }
+
 
         if (["light", "switch"].indexOf(filter) != -1) {
 
@@ -308,7 +347,7 @@ function renderStatesMenu(data, filter) {
                     var entity = data[i];
                     if (getEntityClass(entity.entity_id) != "group" && entity.entity_id == menuPosToEntity[e.itemIndex].entity_id) {
                         // && entity.entity_id == menuPosToEntity[e.itemIndex]
-                        // console.log("Does " + entity.entity_id + " match " + menuPosToEntity[e.itemIndex].entity_id)
+                        //console.log("Does " + entity.entity_id + " match " + menuPosToEntity[e.itemIndex].entity_id)
                         data = entity;
                         break;
                     }
@@ -328,7 +367,7 @@ function renderStatesMenu(data, filter) {
                     if (entity.state == "on") { icon = "IMAGE_ICON_BULB_ON" }
                     if (entity.state == "off") { icon = "IMAGE_ICON_BULB" }
                 }
-                if (getEntityClass(entity.entity_id) == "switch") {
+                if (["switch", "input_boolean"].indexOf(getEntityClass(entity.entity_id)) != -1) {
                     if (entity.state == "on") { icon = "IMAGE_ICON_SWITCH_ON" }
                     if (entity.state == "off") { icon = "IMAGE_ICON_SWITCH_OFF" }
                 }
@@ -405,12 +444,17 @@ function renderStatesMenu(data, filter) {
                 mainMenu.item(0, e.itemIndex, o);
 
             })
+        } else if (filter == "media_player") {
+            console.log("Short press media player")
+
+            showMediaControllerWindow(menuPosToEntity[e.itemIndex])            
+
         }
 
     });
 
     mainMenu.on('longSelect', function(e) {
-        if (["cover", "sensor", "switch"].indexOf(filter) != -1) {
+        if (["cover", "sensor", "switch", "media_player"].indexOf(filter) != -1) {
             var s = menuPosToEntity[e.itemIndex];
             console.log("Cached state: " + JSON.stringify(s))
 
@@ -573,6 +617,174 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData) {
     wind_sensorDetail.add(sensorName);
     wind_sensorDetail.show();
 }
+
+function showMediaControllerWindow(mediaPlayer) {
+
+        var is_muted = mediaPlayer.attributes.is_volume_muted
+
+        wind_mediaControl = new UI.Window({
+            status: {
+                color: 'black',
+                backgroundColor: 'white',
+                seperator: "dotted"
+            },
+            backgroundColor: "white",
+            action: {
+                up: "IMAGE_ICON_VOLUME_UP",
+                select: "IMAGE_ICON_PLAYPAUSE",
+                down: "IMAGE_ICON_VOLUME_DOWN",
+            }
+        });
+    
+        var titleFont = "gothic_24_bold"
+        var titleY = 3
+        if (mediaPlayer.attributes.friendly_name.length > 17) {
+            titleFont = "gothic_14_bold"
+            titleY = 6
+        }
+        var mediaName = new UI.Text({
+            text: mediaPlayer.attributes.friendly_name,
+            color: Feature.color(colour.highlight, "black"),
+            font: titleFont,
+            position: Feature.round(new Vector(10, titleY), new Vector(5, titleY)),
+            size: Feature.round(new Vector(160, 30), new Vector(129, 30)),
+            textAlign: Feature.round("center", "left")
+        });
+    
+        var mediaIcon = new UI.Image({
+            position: new Vector(6, 115),
+            size: new Vector(25, 25),
+            compositing: "set",
+            backgroundColor: 'transparent',
+            image: "IMAGE_ICON_MEDIA"
+        });
+        var muteIcon = new UI.Image({
+            position: new Vector(9, 80),
+            size: new Vector(25, 25),
+            compositing: "set",
+            backgroundColor: 'transparent',
+            image: "IMAGE_ICON_UNMUTED"
+        });
+        if (mediaPlayer.attributes.is_volume_muted) {
+            muteIcon.image("IMAGE_ICON_MUTED");
+        }
+
+        var volumePercentLbl = new UI.Text({
+            text: "%",
+            color: "black",
+            font: "gothic_14",
+            position: new Vector(Feature.resolution().x - Feature.actionBarWidth() - 30, 80),
+            size: new Vector(30,30),
+            textAlign: Feature.round("center", "left")
+        });
+
+        var progress_bg = new UI.Line({
+            position: new Vector(10, 105),
+            position2: new Vector(134 - Feature.actionBarWidth(), 105),
+            strokeColor: 'black',
+            strokeWidth: 5,
+        });
+        var progress_bg_inner = new UI.Line({
+            position: new Vector(10, 105),
+            position2: new Vector(134 - Feature.actionBarWidth(), 105),
+            strokeColor: 'white',
+            strokeWidth: 3,
+        });
+        var progress_fg = new UI.Line({
+            position: new Vector(10, 105),
+            position2: new Vector(10, 105),
+            strokeColor: 'black',
+            strokeWidth: 3,
+        });
+        progress_fg.maxWidth = 134 - Feature.actionBarWidth()
+          
+
+        wind_mediaControl.on('click', 'select', function(e) {
+            hass.playPause(mediaPlayer);
+        });
+
+        wind_mediaControl.on('longClick', 'select', function(e) {
+            hass.toggle(mediaPlayer, function(d) {
+                console.log(d)
+            })
+        });
+
+        wind_mediaControl.on('click', 'up', function(e) {
+            hass.volume_up(mediaPlayer, function(d) {
+                if (d[0] != null) {
+                    refreshMediaProgress(volumePercentLbl, progress_fg, muteIcon, d[0]);
+                }
+            })
+        });
+
+        wind_mediaControl.on('click', 'down', function(e) {
+            hass.volume_down(mediaPlayer, function(d) {
+
+                if (d[0] != null) {
+                    refreshMediaProgress(volumePercentLbl, progress_fg, muteIcon, d[0]);
+                }
+
+            })
+        });
+
+        wind_mediaControl.on('longClick', 'down', function(e) {
+
+            console.log("Is muted: " + mediaPlayer.attributes.is_volume_muted)
+
+            if (is_muted) {
+
+                hass.unmute(mediaPlayer, function(d) {
+                    if (d[0] != null) {
+                        refreshMediaProgress(volumePercentLbl, progress_fg, muteIcon, d[0]);
+                    }
+                    is_muted = false
+
+                })
+
+            } else {
+
+                
+                hass.mute(mediaPlayer, function(d) {
+                    if (d[0] != null) {
+                        refreshMediaProgress(volumePercentLbl, progress_fg, muteIcon, d[0]);
+                    }
+                    is_muted = true
+                })
+            }
+
+        });
+    
+        
+        if (config.enableIcons && Feature.rectangle()) { 
+            wind_mediaControl.add(mediaIcon); 
+            wind_mediaControl.add(muteIcon)
+        }
+        // if (extraData != null && extraData != "") { wind_mediaControl.add(mediaExtraDeets); }
+        // wind_mediaControl.add(sensorValue);
+        wind_mediaControl.add(progress_bg);
+        wind_mediaControl.add(progress_bg_inner);
+        wind_mediaControl.add(progress_fg);
+        wind_mediaControl.add(volumePercentLbl);
+        wind_mediaControl.add(mediaName);
+        wind_mediaControl.show();
+        refreshMediaProgress(volumePercentLbl, progress_fg, muteIcon, mediaPlayer);
+}
+function refreshMediaProgress(textbox, progress, muteIcon, mediaPlayer) {
+
+    if (mediaPlayer == null) { return }
+    
+    var x2 = progress.position().x + (parseInt(progress.maxWidth) * parseFloat(mediaPlayer.attributes.volume_level))
+    progress.animate('position2', new Vector(x2, progress.position2().y), 500)
+
+    if (mediaPlayer.attributes.is_volume_muted) {
+        muteIcon.image("IMAGE_ICON_MUTED");
+        textbox.text("");
+    } else {
+        muteIcon.image("IMAGE_ICON_UNMUTED");
+        textbox.text(mediaPlayer.attributes.volume_level.toFixed(2).toString().split(".")[1] + "%");
+    }
+}
+
 
 function updateBrightness(entity, brightness) {
     //Do a call and use this code in the callback eventually
