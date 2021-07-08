@@ -12,8 +12,8 @@ There are only two 'Home Assistant' apps on the [Rebble app store](https://apps.
 
 - Lights:
   - [X] List lights and toggle their on/off states
-  - [ ] Long-press to view more information
-  - [ ] Change brightness
+  - [X] Long-press to view more information
+  - [X] Change brightness
   - [ ] Set bulb colour
 - Switches:
   - [X] List switches in home assistant
