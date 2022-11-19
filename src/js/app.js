@@ -155,6 +155,15 @@ go();
 
 function go() {
 
+    if (validateSettings() == false) {
+        //Need to do settings
+        console.log("Need to force configuration")
+        return
+    }
+
+    //If we're here, we have enough settings to start
+    hass.init(Settings.option("url"), Settings.option("token"))
+
     if (Platform.version() == "aplite") {
         console.log("Platform is aplite and icons make it sad. Disabling")
         config.enableIcons = false;
@@ -187,6 +196,49 @@ function go() {
 
 }
 //});
+
+function validateSettings() {
+    console.log("Validate settings")
+
+    if (Settings.option("url") == null) {
+        console.log("URL unset")
+        return false
+    }
+    if (Settings.option("token") == null) {
+        console.log("Token unset")
+        return false
+    }
+    if (Settings.option("hideUE") == null) {
+        console.log("hideUE unset")
+        return false
+    }
+    console.log("Minimum settings present. Good to go.")
+    return true
+}
+Settings.config(
+    { url: 'http://willow.systems/pebble/configs/hassio' },
+    function(e) {
+      console.log('closed configurable');
+  
+      // Show the parsed response
+      console.log(JSON.stringify(e.options));
+  
+      // Show the raw response if parsing failed
+      if (e.failed) {
+        console.log(e.response);
+      } else {
+        //Copy option -> data so if the settings are submitted with no token later we can copy it back
+        //A blank token submission should not update the setting
+        if (Settings.option("token") != "" && Settings.option("token") != null) {
+            Settings.data("token", Settings.option("token"))
+        } else {
+            Settings.option("token", Settings.data("token"))
+        }
+        
+        hass.init(Settings.option("url"), Settings.option("token"))
+      }
+    }
+  );
 
 function renderStatesMenu(data, filter) {
     console.log("Filter: " + filter);
@@ -371,12 +423,17 @@ function renderStatesMenu(data, filter) {
             mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: '...' });
         }
 
+
+        console.log("-=-=-=-=-=--=-1: filter: " + filter)
         //cover, input_boolean, media_player and switch all have filter=switch. Now we need cover to be 'cover' again
         //input_boolean stays as 'switch'
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "cover") { filter = "cover" }
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "media_player") { filter = "media_player" }
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "timer") { filter = "timer" }
+        //If we don't include switch here once we hit a timer we can't go back to switch
+        if (["input_boolean","switch"].includes(getEntityClass(menuPosToEntity[e.itemIndex].entity_id))) { filter = "switch" }
 
+        console.log("-=-=-=-=-=--=-2: filter: " + filter)
 
         if (["light", "switch"].indexOf(filter) != -1) {
 
@@ -403,7 +460,7 @@ function renderStatesMenu(data, filter) {
                 }
 
                 var subtitle = data.state
-                var icon = e.item.icon
+                icon = e.item.icon
                 console.log("---------------------")
                 console.log(data)
                 if (entity.state == "on" && data.attributes.hasOwnProperty("brightness")) {
@@ -647,6 +704,8 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData, entity) {
             backgroundColor: 'white',
             seperator: "dotted"
         },
+        scrollable: true,
+        height: 300,
         backgroundColor: "white"
     });
 
@@ -703,10 +762,10 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData, entity) {
     wind_sensorDetail.add(sensorName);
     wind_sensorDetail.show();
 
-    wind_sensorDetail.on('longClick', 'down', function(e) {
-        console.log("Toggle blacklist status for entityID: " + entity.entity_id);
-        blacklistMsg.text("HOld down to un-blacklist entity");
-    });
+    // wind_sensorDetail.on('longClick', 'down', function(e) {
+    //     console.log("Toggle blacklist status for entityID: " + entity.entity_id);
+    //     blacklistMsg.text("HOld down to un-blacklist entity");
+    // });
 }
 
 function showMediaControllerWindow(mediaPlayer) {

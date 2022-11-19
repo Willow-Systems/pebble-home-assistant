@@ -4,14 +4,17 @@ var tempAuth = require("./hackyTempAuth");
 
 var env = {
     token: "",
-    serverAddress: "https://ha.will0.id",
-    serverPort: 443
-    // serverAddress: "http://ha.will0.id:8123",
-    // serverPort: "8123"
+    serverAddress: ""
 }
 
 //Here until I get settings up and running:
 env.token = tempAuth.issue()
+
+function init(url, token) {
+    console.log("Init hass runtime, using instance @ " + url)
+    env.serverAddress = url
+    env.token = token
+}
 
 function log(text, verboseOnly) {
     console.log(text)
@@ -19,12 +22,6 @@ function log(text, verboseOnly) {
 
 function _url() {
     var a = env.serverAddress;
-    // if ({
-    //   "http": 80,
-    //   "https": 443
-    // }[env.serverAddress.substr(0,6)] != serverPort) {
-    //   a += env.serverPort
-    // }
     return a
 }
 
@@ -48,7 +45,7 @@ function makePostRequest(path, data, cb) {
 function genericNetworkFail(e) {
     var ohno = new UI.Card({
         title: 'Uh Oh',
-        body: 'Failed to talk to Home Assistant',
+        body: 'Failed to talk to Home Assistant at ' + env.serverAddress + ". \nCheck address & token?",
         style: "small",
         scrollable: false
     });
@@ -211,6 +208,7 @@ function refresh(entity, cb) {
 
 }
 
+module.exports.init = init
 module.exports.getStates = getStates;
 module.exports.getState = getState;
 module.exports.toggle = toggle;
