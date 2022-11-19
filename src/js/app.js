@@ -9,7 +9,6 @@ var hass = require('./hass.js');
 
 setSettingsToDefaultIfRequired();
 
-var entityTypeWhitelist = ["light"];
 var entityBlacklist = [
     "light.configuration_tool_1",
     "light.wut",
@@ -38,7 +37,7 @@ var config = {
 var sensorConfig = {
     blacklist: [],
     excludeCertificates: true,
-    enableWhitelist: true,
+    enableWhitelist: false,
     whitelist: [
         "sensor.landing_sensor_temperature",
         "sensor.hallway_sensor_temperature",
@@ -48,7 +47,9 @@ var sensorConfig = {
         "binary_sensor.front_door",
         "binary_sensor.back_door",
         "sensor.minecraft_server_players_online",
-        "sensor.nextbintype"
+        "sensor.nextbintype",
+        "sensor.octoprint_job_percentage",
+        "sensor.mi_9t_pro_battery_level"
     ],
     invertSubtitle: false
 }
@@ -58,14 +59,35 @@ var colour = {
 }
 
 function setSettingsToDefaultIfRequired() {
-    console.log("Internal settings unset. Setting to default")
     if (Settings.data('ui_show_lights') == null) {
+        console.log("Internal settings unset. Setting to default")
         Settings.data('ui_show_lights', true);
         Settings.data('ui_show_switches', true);
         Settings.data('ui_show_sensors', true);
         Settings.data('ui_show_automations', false);
         Settings.data('ui_show_mediaplayers', true);
     }
+}
+
+function addToBlacklist(entityID) {
+    if (! isBlacklisted(entityID)) {
+        entityBlacklist.push(entityID)
+    }
+}
+function removeFromBlacklist(entityID) {
+    for (var i=0; i<entityBlacklist.length;i++) {
+        if (entityBlacklist[i] == entityID) {
+            entityBlacklist.splice(i,1)
+        }
+    }
+}
+function isBlacklisted(entityID) {
+    for (var i=0; i<entityBlacklist.length;i++) {
+        if (entityBlacklist[i] == entityID) {
+            return true
+        }
+    }
+    return false
 }
 
 
@@ -171,6 +193,8 @@ function renderStatesMenu(data, filter) {
     menuPosToEntity = [];
     var menuItemArray = [];
 
+    console.log(JSON.stringify(data))
+
     for (var i = 0; i < data.length; i++) {
 
         var entity = data[i];
@@ -183,6 +207,7 @@ function renderStatesMenu(data, filter) {
         entityType = entityType.replace("cover", "switch");
         entityType = entityType.replace("input_boolean", "switch")
         entityType = entityType.replace("media_player", "switch")
+        entityType = entityType.replace("timer", "switch")
 
         if (entityType.indexOf(filter) != -1 && entityBlacklist.indexOf(entity.entity_id) == -1 && (config.hideUnavailable == false || entity.state != "unavailable")) {
 
@@ -274,14 +299,28 @@ function renderStatesMenu(data, filter) {
 
                 subtitle = ""
                 if (title.length > 11) {
-                    title = entity.attributes.friendly_name.substr(0, 11)
-                    subtitle = entity.attributes.friendly_name.substr(11)
+                    title = entity.attributes.friendly_name.substr(0, 11) + ".."
+                    subtitle = ".." + entity.attributes.friendly_name.substr(11)
                 }
                 icon = {
                     "on": "IMAGE_ICON_MEDIA",
                     "off": "IMAGE_ICON_MEDIA",
                     "unavailable": "IMAGE_ICON_UNAVAILABLE"
                 }[entity.state]
+
+            } else if (entity.type == "timer") {
+
+                subtitle = entity.state
+                if (title.length > 11) {
+                    title = entity.attributes.friendly_name.substr(0, 11) + ".."
+                }
+                icon = "IMAGE_ICON_TIMER"
+                if (entity.state == "active") {
+                    subtitle = friendlyRemaining(entity.attributes.finishes_at)
+                }
+                if (entity.state == "paused") {
+                    friendlyRemaining("Paused (" + entity.attributes.finishes_at + ")")
+                }
 
             } else {
                 console.log(JSON.stringify(entity))
@@ -336,6 +375,7 @@ function renderStatesMenu(data, filter) {
         //input_boolean stays as 'switch'
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "cover") { filter = "cover" }
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "media_player") { filter = "media_player" }
+        if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "timer") { filter = "timer" }
 
 
         if (["light", "switch"].indexOf(filter) != -1) {
@@ -343,16 +383,24 @@ function renderStatesMenu(data, filter) {
             hass.toggle(menuPosToEntity[e.itemIndex], function(data, itemIndex) {
 
                 console.log("Got this back: " + JSON.stringify(data))
-                for (var i = 0; i < data.length; i++) {
-                    var entity = data[i];
-                    if (getEntityClass(entity.entity_id) != "group" && entity.entity_id == menuPosToEntity[e.itemIndex].entity_id) {
-                        // && entity.entity_id == menuPosToEntity[e.itemIndex]
-                        //console.log("Does " + entity.entity_id + " match " + menuPosToEntity[e.itemIndex].entity_id)
-                        data = entity;
-                        break;
-                    }
+                if (typeof data != "object") {
+                    JSON.parse(data)
                 }
 
+                if (data.constructor == Array) {
+                    //Sometimes the data will return an array of updated entities. We only care about our own.
+                    for (var i = 0; i < data.length; i++) {
+                        var entity = data[i];
+                        if (getEntityClass(entity.entity_id) != "group" && entity.entity_id == menuPosToEntity[e.itemIndex].entity_id) {
+                            // && entity.entity_id == menuPosToEntity[e.itemIndex]
+                            //console.log("Does " + entity.entity_id + " match " + menuPosToEntity[e.itemIndex].entity_id)
+                            data = entity;
+                            break;
+                        }
+                    }
+                } else {
+                    entity = data;
+                }
 
                 var subtitle = data.state
                 var icon = e.item.icon
@@ -380,18 +428,12 @@ function renderStatesMenu(data, filter) {
 
         } else if (filter == "cover") {
 
-            //Cover returns nothing, so we have to fudge it
             hass.toggle(menuPosToEntity[e.itemIndex], function(data, itemIndex) {
-                console.log("Special cover handler")
+                
                 console.log("Got this back: " + JSON.stringify(data))
 
-                originalSubtitle = originalSubtitle.toLowerCase();
-
-                if (originalSubtitle == "open") {
-                    var subtitle = "closed"
-                } else {
-                    var subtitle = "open"
-                }
+                subtitle = data.state
+                
                 if (subtitle == "open") { icon = "IMAGE_ICON_BLIND_OPEN" }
                 if (subtitle == "closed") { icon = "IMAGE_ICON_BLIND_CLOSED" }
 
@@ -444,6 +486,36 @@ function renderStatesMenu(data, filter) {
                 mainMenu.item(0, e.itemIndex, o);
 
             })
+        
+        } else if (filter == "timer") {
+
+            hass.refresh(menuPosToEntity[e.itemIndex], function(data) {
+
+                console.log("Got this back: " + JSON.stringify(data))
+                    //Update cache
+                menuPosToEntity[itemIndex] = data
+                console.log("Update cache @ " + itemIndex)
+
+                //This code repeats and that's terrible. I should feel bad. Need to fix this later
+                var subtitle = data.state
+                var title = data.attributes.friendly_name
+                if (title.length > 11) {
+                    title = data.attributes.friendly_name.substr(0, 11) + ".."
+                }
+                icon = "IMAGE_ICON_TIMER"
+                if (data.state == "active") {
+                    subtitle = friendlyRemaining(data.attributes.finishes_at)
+                }
+                if (data.state == "paused") {
+                    friendlyRemaining("Paused (" + data.attributes.finishes_at + ")")
+                }
+
+                var o = { title: e.item.title, subtitle: subtitle }
+                if (config.enableIcons) { o.icon = icon }
+                mainMenu.item(0, e.itemIndex, o);
+
+            })
+        
         } else if (filter == "media_player") {
             console.log("Short press media player")
 
@@ -454,6 +526,13 @@ function renderStatesMenu(data, filter) {
     });
 
     mainMenu.on('longSelect', function(e) {
+
+        //cover, input_boolean, media_player and switch all have filter=switch. Now we need cover to be 'cover' again
+        //input_boolean stays as 'switch'
+        if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "cover") { filter = "cover" }
+        if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "media_player") { filter = "media_player" }
+        if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "timer") { filter = "timer" }
+
         if (["cover", "sensor", "switch", "media_player"].indexOf(filter) != -1) {
             var s = menuPosToEntity[e.itemIndex];
             console.log("Cached state: " + JSON.stringify(s))
@@ -496,11 +575,18 @@ function renderStatesMenu(data, filter) {
             var state = getCleanedState(s);
             if (attrs.hasOwnProperty("unit_of_measurement")) { state += " " + attrs.unit_of_measurement }
 
-            showSensorDetailWindow(attrs.friendly_name, state, e.item.icon, extraData);
+            showSensorDetailWindow(attrs.friendly_name, state, e.item.icon, extraData, s);
 
         } else if (filter == "light") {
+
             var s = menuPosToEntity[e.itemIndex];
             showLightDetailWindow(s);
+        
+        } else if (filter == "timer") {
+
+            var s = menuPosToEntity[e.itemIndex];
+            showTimerDetailWindow(s);
+
         } else {
             console.log("Unimplemented");
         }
@@ -554,7 +640,7 @@ function updateMainMenuEntity(entity) {
     }
 }
 
-function showSensorDetailWindow(_title, _value, _icon, _extraData) {
+function showSensorDetailWindow(_title, _value, _icon, _extraData, entity) {
     wind_sensorDetail = new UI.Window({
         status: {
             color: 'black',
@@ -616,9 +702,17 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData) {
     wind_sensorDetail.add(sensorValue);
     wind_sensorDetail.add(sensorName);
     wind_sensorDetail.show();
+
+    wind_sensorDetail.on('longClick', 'down', function(e) {
+        console.log("Toggle blacklist status for entityID: " + entity.entity_id);
+        blacklistMsg.text("HOld down to un-blacklist entity");
+    });
 }
 
 function showMediaControllerWindow(mediaPlayer) {
+
+        console.log("-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")
+        console.log(mediaPlayer)
 
         var is_muted = mediaPlayer.attributes.is_volume_muted
 
@@ -696,11 +790,16 @@ function showMediaControllerWindow(mediaPlayer) {
             strokeColor: 'black',
             strokeWidth: 3,
         });
-        progress_fg.maxWidth = 134 - Feature.actionBarWidth()
+        progress_fg.maxWidth = 134 - Feature.actionBarWidth() - 10
           
 
         wind_mediaControl.on('click', 'select', function(e) {
             hass.playPause(mediaPlayer);
+            hass.getState(mediaPlayer.entity_id, function(player) {
+                if (player.state == "off") {
+                    hass.toggle(mediaPlayer, function(d){});
+                }
+            })
         });
 
         wind_mediaControl.on('longClick', 'select', function(e) {
@@ -767,24 +866,232 @@ function showMediaControllerWindow(mediaPlayer) {
         wind_mediaControl.add(volumePercentLbl);
         wind_mediaControl.add(mediaName);
         wind_mediaControl.show();
-        refreshMediaProgress(volumePercentLbl, progress_fg, muteIcon, mediaPlayer);
+        refreshMediaProgress(volumePercentLbl, progress_fg, muteIcon, wind_mediaControl, mediaPlayer);
+
+        var refreshStateTimer = setInterval(function() {
+            hass.getState(mediaPlayer.entity_id, function(state) {
+                refreshMediaProgress(volumePercentLbl, progress_fg, muteIcon, wind_mediaControl, state);
+            })
+        }, 2000)
+        wind_mediaControl.on('hide', function() {
+            //Cancel refresh interval
+            console.log("Clear media player refresh interval ID " + refreshStateTimer)
+            clearInterval(refreshStateTimer)
+        })
 }
-function refreshMediaProgress(textbox, progress, muteIcon, mediaPlayer) {
+function refreshMediaProgress(textbox, progress, muteIcon, window, mediaPlayer) {
 
     if (mediaPlayer == null) { return }
-    
-    var x2 = progress.position().x + (parseInt(progress.maxWidth) * parseFloat(mediaPlayer.attributes.volume_level))
-    progress.animate('position2', new Vector(x2, progress.position2().y), 500)
 
-    if (mediaPlayer.attributes.is_volume_muted) {
-        muteIcon.image("IMAGE_ICON_MUTED");
-        textbox.text("");
+    if (mediaPlayer.state == "off") {
+
+        textbox.text("Off");
+        progress.animate('position2', new Vector(progress.position().x, progress.position2().y), 500)
+        window.action({
+            select: "IMAGE_ICON_POWER",
+            up: null,
+            down: null,
+        })
+
     } else {
-        muteIcon.image("IMAGE_ICON_UNMUTED");
-        textbox.text(mediaPlayer.attributes.volume_level.toFixed(2).toString().split(".")[1] + "%");
+
+        window.action({
+            up: "IMAGE_ICON_VOLUME_UP",
+            select: "IMAGE_ICON_PLAYPAUSE",
+            down: "IMAGE_ICON_VOLUME_DOWN",
+        })
+    
+        var x2 = progress.position().x + (parseInt(progress.maxWidth) * parseFloat(mediaPlayer.attributes.volume_level))
+        progress.animate('position2', new Vector(x2, progress.position2().y), 500)
+
+        if (mediaPlayer.attributes.is_volume_muted) {
+            muteIcon.image("IMAGE_ICON_MUTED");
+            textbox.text("");
+        } else {
+            muteIcon.image("IMAGE_ICON_UNMUTED");
+            if (mediaPlayer.attributes.volume_level == 1) {
+                textbox.text("MAX");
+            } else {
+                textbox.text(mediaPlayer.attributes.volume_level.toFixed(2).toString().split(".")[1] + "%");
+            }
+        }
+    
     }
 }
 
+function showTimerDetailWindow(timer) {
+
+    wind_timerControl = new UI.Window({
+        status: {
+            color: 'black',
+            backgroundColor: 'white',
+            seperator: "dotted"
+        },
+        backgroundColor: "white",
+        action: {
+            up: "IMAGE_ICON_PLAY",
+            select: "IMAGE_ICON_PAUSE",
+            down: "IMAGE_ICON_STOP",
+        }
+    });
+
+    var titleFont = "gothic_24_bold"
+    var titleY = 3
+    if (timer.attributes.friendly_name.length > 17) {
+        titleFont = "gothic_14_bold"
+        titleY = 6
+    }
+    var timerName = new UI.Text({
+        text: timer.attributes.friendly_name,
+        color: Feature.color(colour.highlight, "black"),
+        font: titleFont,
+        position: Feature.round(new Vector(10, titleY), new Vector(5, titleY)),
+        size: Feature.round(new Vector(160, 30), new Vector(129, 30)),
+        textAlign: Feature.round("center", "left")
+    });
+
+    var timerStatus = new UI.Text({
+        text: " ",
+        color: 'black',
+        font: "gothic_14_bold",
+        position: Feature.round(new Vector(10, 45), new Vector(5, 45)),
+        size: Feature.round(new Vector(180, 30), new Vector(150, 30)),
+        textAlign: Feature.round("center", "left")
+    });
+
+
+    var timerIcon = new UI.Image({
+        position: new Vector(6, 115),
+        size: new Vector(25, 25),
+        compositing: "set",
+        backgroundColor: 'transparent',
+        image: "IMAGE_ICON_TIMER"
+    });
+
+    var timerPercentLbl = new UI.Text({
+        text: "%",
+        color: "black",
+        font: "gothic_14",
+        position: new Vector(Feature.resolution().x - Feature.actionBarWidth() - 30, 80),
+        size: new Vector(30,30),
+        textAlign: Feature.round("center", "left")
+    });
+
+    var progress_bg = new UI.Line({
+        position: new Vector(10, 105),
+        position2: new Vector(134 - Feature.actionBarWidth(), 105),
+        strokeColor: 'black',
+        strokeWidth: 5,
+    });
+    var progress_bg_inner = new UI.Line({
+        position: new Vector(10, 105),
+        position2: new Vector(134 - Feature.actionBarWidth(), 105),
+        strokeColor: 'white',
+        strokeWidth: 3,
+    });
+    var progress_fg = new UI.Line({
+        position: new Vector(10, 105),
+        position2: new Vector(10, 105),
+        strokeColor: 'black',
+        strokeWidth: 3,
+    });
+    progress_fg.maxWidth = 134 - Feature.actionBarWidth() - 10
+      
+
+    wind_timerControl.on('click', 'up', function(e) {
+        hass.timer_play(timer, function(state) {
+            setTimerProgress(timerStatus, timerPercentLbl, progress_fg, state)
+        })
+    });
+
+    wind_timerControl.on('click', 'select', function(e) {
+        hass.timer_pause(timer, function(state) {
+            setTimerProgress(timerStatus, timerPercentLbl, progress_fg, state)
+        })
+    });
+
+    wind_timerControl.on('click', 'down', function(e) {
+        hass.timer_stop(timer, function(state) {
+            setTimerProgress(timerStatus, timerPercentLbl, progress_fg, state)
+        })
+    });
+
+    wind_timerControl.on('longClick', 'down', function(e) {
+        hass.timer_cancel(timer, function(state) {
+            setTimerProgress(timerStatus, timerPercentLbl, progress_fg, state)
+        })
+    });
+
+    
+    if (config.enableIcons && Feature.rectangle()) { 
+        wind_timerControl.add(timerIcon); 
+    }
+    // if (extraData != null && extraData != "") { wind_mediaControl.add(mediaExtraDeets); }
+    // wind_mediaControl.add(sensorValue);
+    wind_timerControl.add(progress_bg);
+    wind_timerControl.add(progress_bg_inner);
+    wind_timerControl.add(progress_fg);
+    wind_timerControl.add(timerStatus);
+    wind_timerControl.add(timerPercentLbl);
+    wind_timerControl.add(timerName);
+    wind_timerControl.show();
+    setTimerProgress(timerStatus, timerPercentLbl, progress_fg, timer);
+
+    var refreshStateTimer = setInterval(function() {
+        hass.getState(timer.entity_id, function(state) {
+            setTimerProgress(timerStatus, timerPercentLbl, progress_fg, state)
+        })
+    }, 2000)
+
+    wind_timerControl.on('hide', function() {
+        //Cancel refresh timer
+        console.log("Clear timer refresh interval ID " + refreshStateTimer)
+        clearInterval(refreshStateTimer)
+    })
+}
+function setTimerProgress(statusTextbox, progressTextbox, progress, timer) {
+
+if (timer == null) { return }
+
+//We need to convert the timer different into a decimal percentage (0.00 - 1.0)
+//I miss modern JS features
+var date_now = new Date()
+var date_then = new Date(timer.attributes.finishes_at)
+if (! timer.attributes.hasOwnProperty("finishes_at") || date_then <= date_now) {
+    //Finishes in the past / is complete / No end time
+    var progress_percentage = 0
+    var duration_seconds = 0
+    var delta = 0
+
+} else {
+    var tmr = timer.attributes.duration.split(":")
+    var h = tmr[0]
+    var m = tmr[1]
+    var s = tmr[2]
+    var duration_seconds = (parseInt(h) * 60 * 60) + (parseInt(m) * 60) + (parseInt(s))
+    var delta = (date_then.getTime() - date_now.getTime()) / 1000
+    var progress_percentage = 1 - (delta / duration_seconds)
+}
+
+console.log('duration_seconds: ' + duration_seconds)
+console.log('delta: ' + delta)
+console.log('progress_percentage: ' + progress_percentage)
+
+
+var x2 = progress.position().x + (parseInt(progress.maxWidth) * parseFloat(progress_percentage))
+progress.animate('position2', new Vector(x2, progress.position2().y), 500)
+
+if (timer.state == "active") {
+    statusTextbox.text(friendlyRemaining(timer.attributes.finishes_at))
+    progressTextbox.text(progress_percentage.toFixed(2).toString().split(".")[1] + "%");
+} else if (timer.state == "paused") {
+    statusTextbox.text("paused (" + timer.attributes.remaining + ")")
+    progressTextbox.text(progress_percentage.toFixed(2).toString().split(".")[1] + "%");
+} else {
+    statusTextbox.text(timer.state)
+    progressTextbox.text(" ");
+}
+}
 
 function updateBrightness(entity, brightness) {
     //Do a call and use this code in the callback eventually
@@ -793,15 +1100,20 @@ function updateBrightness(entity, brightness) {
 
     wayBack.brightnessChange = entity.entity_id
     console.log("Calling hass to update brightness for " + wayBack.brightnessChange);
-    hass.setLightBrightness(entity, bri_abs, function(entities) {
-            console.log("Brightness up callback running");
+    hass.setLightBrightness(entity, bri_abs, function(data) {
+            console.log("Brightness change callback running");
+
             //We get a list of entities back, find ours.
-            for (var i = 0; i < entities.length; i++) {
-                var entity = entities[i];
-                if (entity.entity_id == wayBack.brightnessChange) {
-                    refreshLightDetailUI(entity);
-                    break;
+            if (data.constructor == Array) {
+                for (var i = 0; i < data.length; i++) {
+                    var entity = data[i];
+                    if (entity.entity_id == wayBack.brightnessChange) {
+                        refreshLightDetailUI(entity);
+                        break;
+                    }
                 }
+            } else {
+                refreshLightDetailUI(data);
             }
         })
         //Hack
@@ -814,15 +1126,21 @@ function updateTemperature(entity, colorTemp) {
     console.log("Update colour temp to " + colorTemp)
     wayBack.temperatureChange = entity.entity_id
 
-    hass.setLightTemperature(entity, colorTemp, function(entities) {
+    hass.setLightTemperature(entity, colorTemp, function(data) {
         console.log("Light temperature change callback running");
+        console.log("Got data: ")
+        console.log(data)
         //We get a list of entities back, find ours.
-        for (var i = 0; i < entities.length; i++) {
-            var entity = entities[i];
-            if (entity.entity_id == wayBack.temperatureChange) {
-                refreshLightDetailUI(entity);
-                break;
+        if (data.constructor == Array) {
+            for (var i = 0; i < data.length; i++) {
+                var entity = data[i];
+                if (entity.entity_id == wayBack.temperatureChange) {
+                    refreshLightDetailUI(entity);
+                    break;
+                }
             }
+        } else {
+            refreshLightDetailUI(data);
         }
     });
 
@@ -944,7 +1262,7 @@ function refreshLightDetailUI(state) {
 
         //Calc position for slider for brightness
         var tickLeft = 10 + ((125 / 100) * bri_perc);
-        brightnessUI.tick_brightness.animate({ position: new Vector(tickLeft, 74) })
+        brightnessUI.tick_brightness.animate({ position: new Vector(tickLeft, 72) })
 
         if (state.meta.supportsTemperature) {
             //Unhide control if hidden
@@ -1115,7 +1433,7 @@ function showLightDetailWindow(entity) {
             strokeWidth: 6
         });
         brightnessUI.tick_brightness = new UI.Image({
-            position: new Vector(62, 74),
+            position: new Vector(62, 72),
             size: new Vector(9, 5),
             compositing: "set",
             backgroundColor: 'transparent',
@@ -1298,9 +1616,9 @@ function showLightDetailWindow(entity) {
 
     wind_lightDetail.on('click', 'select', function() {
         brightnessMenuActiveItem += 1;
-        if (brightnessUI.activeEntity.meta.supportsTemperature == false && brightnessMenuActiveItem > 0) { brightnessMenuActiveItem = 2 }
+        if (brightnessUI.activeEntity.meta.supportsTemperature == false && brightnessMenuActiveItem > 0) { brightnessMenuActiveItem = 1 }
         if (brightnessUI.activeEntity.meta.supportsRGB == false && brightnessMenuActiveItem > 1) { brightnessMenuActiveItem = 0 }
-        if (brightnessMenuActiveItem > 2) { brightnessMenuActiveItem = 0 }
+        if (brightnessMenuActiveItem > 1) { brightnessMenuActiveItem = 0 }
         if (config.ux.hasChangedLightOperationsBefore == false && brightnessUI.activeEntity.meta.supportsTemperature) {
             config.ux.hasChangedLightOperationsBefore = true;
             brightnessUI.ux_explain.animate({
@@ -1312,25 +1630,31 @@ function showLightDetailWindow(entity) {
     wind_lightDetail.on('longClick', 'select', function() {
         wayBack.toggle = entity.entity_id
         brightnessMenuActiveItem = 0;
-        hass.toggle(entity, function(entities) {
-                console.log("Toggle callback running");
+        hass.toggle(entity, function(data) {
+                console.log("Toggle callback running!");
+                console.log("Data")
+                console.log(data)
                 //We get a list of entities back, find ours.
-                for (var i = 0; i < entities.length; i++) {
-                    var entity = entities[i];
-                    if (entity.entity_id == wayBack.toggle) {
-                        refreshLightDetailUI(entity);
-                        break;
-                    }
+                if (data.constructor == Array) {
+                    for (var i = 0; i < data.length; i++) {
+                        var entity = data[i];
+                        if (entity.entity_id == wayBack.toggle) {
+                            refreshLightDetailUI(entity);
+                            break;
+                        }
+                    } 
+                } else {
+                    refreshLightDetailUI(data);
                 }
             })
             //Hack);
     });
-    wind_lightDetail.on('click', 'back', function() {
-        console.log("Back button pressed. Refresh selected entity");
-        brightnessMenuActiveItem = 0;
-        hass.refresh(entity, updateMainMenuEntity);
-        wind_lightDetail.hide();
-    });
+    // wind_lightDetail.on('click', 'back', function() {
+    //     console.log("Back button pressed. Refresh selected entity");
+    //     wind_lightDetail.hide();
+    //     brightnessMenuActiveItem = 0;
+    //     hass.refresh(entity, updateMainMenuEntity);
+    // });
 }
 
 function getCleanedState(entity) {
@@ -1366,6 +1690,27 @@ function friendlyLastChanged(lc) {
         if (out < 2) { units = "hour" }
     }
     return out + " " + units + " ago";
+}
+
+function friendlyRemaining(endDate) {
+    var then = new Date(endDate);
+    var now = new Date();
+    var delta = (then - now) / 1000;
+    var h = "00"
+    var m = "00"
+    var s = "00"
+    if (delta > 3600) {
+        h = parseInt(delta / 3600)
+        delta = delta % 3600
+    }
+    if (delta > 60) {
+        m = parseInt(delta / 60)
+        if (m < 10) { m = "0" + m}
+        delta = delta % 60
+    }
+    s = parseInt(delta)
+    if (s < 10) { s = "0" + s}
+    return h + ":" + m + ":" + s
 }
 
 function percentageToRadialAngle(perc) {
