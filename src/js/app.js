@@ -6,20 +6,16 @@ var Vector = require('vector2');
 var Feature = require('platform/feature');
 var Platform = require('platform');
 var hass = require('./hass.js');
+var Vibe = require('ui/vibe');
+var version = "1.0"
 
-setSettingsToDefaultIfRequired();
+var emulator_hax = false;
+var always_reset_settings_hax = false;
+var clear_all_hax = false;
+var analytics_ok = true;
+setSettingsToDefaultIfRequired(false);
 
-var entityBlacklist = [
-    "light.configuration_tool_1",
-    "light.wut",
-    "switch.boathouse_lamp",
-    "light.bedroom_2",
-    "input_boolean.alarm_is_activated",
-    "input_boolean.arm_alarm_via_wills_phone_charge",
-    "input_boolean.cat_flap_open",
-    "input_boolean.weather_warning",
-    "input_boolean.use_motion_sensors",
-];
+var entityBlacklist = [];
 
 var config = {
     showLights: Settings.data("ui_show_lights"),
@@ -27,30 +23,16 @@ var config = {
     showSensors: Settings.data('ui_show_sensors'),
     showAutomations: Settings.data('ui_show_automations'),
     showMediaPlayers: Settings.data('ui_show_mediaplayers'),
+    showScripts: Settings.data('ui_show_scripts'),
     enableIcons: true,
-    hideUnavailable: true,
-    ux: {
-        hasChangedLightOperationsBefore: false
-    }
+    requestConfig: false
 }
 
 var sensorConfig = {
     blacklist: [],
     excludeCertificates: true,
     enableWhitelist: false,
-    whitelist: [
-        "sensor.landing_sensor_temperature",
-        "sensor.hallway_sensor_temperature",
-        "sensor.loft_temperature",
-        "sensor.multi_sensor",
-        "sensor.multi_sensor_2",
-        "binary_sensor.front_door",
-        "binary_sensor.back_door",
-        "sensor.minecraft_server_players_online",
-        "sensor.nextbintype",
-        "sensor.octoprint_job_percentage",
-        "sensor.mi_9t_pro_battery_level"
-    ],
+    whitelist: [],
     invertSubtitle: false
 }
 
@@ -58,17 +40,27 @@ var colour = {
     highlight: Feature.color("#00AAFF", "#000000")
 }
 
-function setSettingsToDefaultIfRequired() {
-    if (Settings.data('ui_show_lights') == null) {
+function setSettingsToDefaultIfRequired(force) {
+    if (Settings.data('ui_show_lights') == null || always_reset_settings_hax || force) {
         console.log("Internal settings unset. Setting to default")
         Settings.data('ui_show_lights', true);
         Settings.data('ui_show_switches', true);
         Settings.data('ui_show_sensors', true);
         Settings.data('ui_show_automations', false);
-        Settings.data('ui_show_mediaplayers', true);
+        Settings.data('ui_show_scripts', true)
+        Settings.data('hasChangedLightOperationsBefore', false)
+        Settings.data('welcomeScreen', false)
+        Settings.option("hideUE", true)
+    }
+
+    if (clear_all_hax || force) {
+        Settings.option("token", null)
+        Settings.option("url", null)
+        Settings.option("hideUE", null)
     }
 }
 
+//Unused rn
 function addToBlacklist(entityID) {
     if (! isBlacklisted(entityID)) {
         entityBlacklist.push(entityID)
@@ -89,7 +81,7 @@ function isBlacklisted(entityID) {
     }
     return false
 }
-
+// /unused
 
 mainMenu = new UI.Menu({
     backgroundColor: 'white',
@@ -131,72 +123,139 @@ function getEntityClass(entity_id) {
 console.log("Lets Go!");
 go();
 
-// showLightDetailWindow({
-//   "attributes": {
-// 		"brightness": "150",
-//     "friendly_name": "Wills Office",
-//     "supported_features": 41,
-// 		"max_mireds": 500,
-// 		"min_mireds": 153
-//   },
-//   "context": {
-//     "id": "7d71eeccfb694746a658acf3a1b63776",
-//     "parent_id": null,
-//     "user_id": null
-//   },
-//   "entity_id": "light.lounge_l",
-//   "last_changed": "2021-01-23T10:13:49.081544+00:00",
-//   "last_updated": "2021-01-23T10:13:49.081544+00:00",
-//   "state": "on"
-// });
-
-// showSensorDetailWindow("Test Sensor Long","100","IMAGE_ICON_SENSOR","ExtraEntry: ExtraValue");
-
-
 function go() {
 
-    // if (validateSettings() == false) {
-    //     //Need to do settings
-    //     console.log("Need to force configuration")
-    //     return
-    // }
+    if (Settings.data('welcomeScreen') == false) {
+        //Show the first time run screen
+        setTimeout(function() {
+            showFirstTimeRunScreen()
+            Settings.data('welcomeScreen', true)
+        }, 500);
 
-    //If we're here, we have enough settings to start
-    // hass.init(Settings.option("url"), Settings.option("token"))
-    hass.init("https://ha.will0.id","")
+        submitAnonamousAnalytics(true)
+    } else {
+        submitAnonamousAnalytics(false)
+    }
 
+    if (emulator_hax == true) {
+
+        hass.init("https://ha.will0.id","")
+
+    } else {
+
+        if (validateSettings() == false) {
+            //Need to do settings
+            console.log("Need to force configuration")
+            config.requestConfig = true
+            renderHomeMenu(false)
+        } else {
+            renderHomeMenu(true)
+        }
+
+    }
+}
+
+function renderHomeMenu(hasConfig) {
     if (Platform.version() == "aplite") {
         console.log("Platform is aplite and icons make it sad. Disabling")
         config.enableIcons = false;
     }
-
     var homeItems = [];
-    if (config.showLights) { homeItems.push({ title: "Lights" }) }
-    if (config.showSwitches) { homeItems.push({ title: "Switches" }) }
-    if (config.showSensors) { homeItems.push({ title: "Sensors" }) }
-    // if (config.showMediaPlayers) { homeItems.push({ title: "Media Players" }) }
-    if (config.showAutomations) { homeItems.push({ title: "Automations" }) }
+
+    if (hasConfig) {
+        //If we're here, we have enough settings to start
+        hass.init(Settings.option("url"), Settings.option("token"))
+        
+        if (config.showLights) { homeItems.push({ title: "Lights" }) }
+        if (config.showSwitches) { homeItems.push({ title: "Switches" }) }
+        if (config.showSensors) { homeItems.push({ title: "Sensors" }) }
+        // if (config.showMediaPlayers) { homeItems.push({ title: "Media Players" }) }
+        if (config.showAutomations) { homeItems.push({ title: "Automations" }) }
+        if (config.showScripts) {homeItems.push({ title: "Scripts" }) }
+        homeItems.push({ title: "About"})
+
+        homeMenu.on('select', function(e) {
+            if (e.item.title.toLowerCase() == "lights") {
+                hass.getStates(renderStatesMenu, "light");
+            } else if (e.item.title.toLowerCase() == "switches") {
+                hass.getStates(renderStatesMenu, "switch");
+            } else if (e.item.title.toLowerCase() == "sensors") {
+                hass.getStates(renderStatesMenu, "sensor");
+            } else if (e.item.title.toLowerCase() == "media players") {
+                hass.getStates(renderStatesMenu, "media_player");
+            } else if (e.item.title.toLowerCase() == "automations") {
+                hass.getStates(renderStatesMenu, "automation");
+            } else if (e.item.title.toLowerCase() == "scripts") {
+                hass.getStates(renderStatesMenu, "script");
+            } else if (e.item.title.toLowerCase() == "about") {
+                showAboutScreen()
+            }
+        });
+
+    } else {
+
+        homeItems.push({ title: "Configure Settings", subtitle: "in the Pebble app" })
+
+        homeMenu.on('select', function(e) {
+            
+        });
+
+    }
 
     homeMenu.section(0, {
         items: homeItems
     });
     homeMenu.show();
-    homeMenu.on('select', function(e) {
-        if (e.item.title.toLowerCase() == "lights") {
-            hass.getStates(renderStatesMenu, "light");
-        } else if (e.item.title.toLowerCase() == "switches") {
-            hass.getStates(renderStatesMenu, "switch");
-        } else if (e.item.title.toLowerCase() == "sensors") {
-            hass.getStates(renderStatesMenu, "sensor");
-        } else if (e.item.title.toLowerCase() == "media players") {
-            hass.getStates(renderStatesMenu, "media_player");
-        } else if (e.item.title.toLowerCase() == "automations") {
-            hass.getStates(renderStatesMenu, "automation");
-        }
-    });
-
 }
-//});
+function submitAnonamousAnalytics(firstTime) {
+    if (analytics_ok) {
+        //Analytics
+        var userToken = Pebble.getAccountToken();
+        var watch = Pebble.getActiveWatchInfo();
+        var data = {
+            key: "AFJS676MD8FD0",
+            op: "launch_app",
+            version: version,
+            id: userToken,
+            wid: Pebble.getWatchToken(),
+            hardware: watch.model,
+            local_date: new Date().toISOString(),
+            language: watch.language,
+            firstTime: firstTime
+        }
+        ajax({
+            url: "https://willow.systems/hass-info/info/",
+            method: "POST",
+            type: "json",
+            data: data,
+        }, function() { console.log("A:OK")}, function() { console.log("A:FAIL")});
+    }
+}
+
+function showFirstTimeRunScreen() {
+    var ftrs = new UI.Card({
+        title: 'Home Assistant',
+        body: 'Hi there!\nThanks for installing my home assistant app. Please not that this app is built on PebbleJS and can be glitchy. Backing out of the light detail view normally crashes the app. Sorry! \nFor instructions & documentation, see:\nwillow.systems/ha \nThanks - @Will0',
+        style: "small",
+        scrollable: true
+    });
+    ftrs.show()
+}
+function showAboutScreen() {
+    var aboutScreen = new UI.Card({
+        title: 'Home Assistant',
+        body: 'Version: ' + version + '\nAuthor: @Will0\nYour Instance:\n' + Settings.option("url") + '\n\nBuilt with love as part of Rebble Hackathon #001! See:\n willow.systems/ha\n for info\n\nLong Press Select to full reset app.',
+        style: "small",
+        scrollable: true
+    });
+    aboutScreen.on('longClick', 'select', function(e) {
+        setSettingsToDefaultIfRequired(true)        
+
+        Vibe.vibrate('long');
+        go()
+    });
+    aboutScreen.show()
+}
 
 function validateSettings() {
     console.log("Validate settings")
@@ -231,12 +290,22 @@ Settings.config(
         //Copy option -> data so if the settings are submitted with no token later we can copy it back
         //A blank token submission should not update the setting
         if (Settings.option("token") != "" && Settings.option("token") != null) {
+            console.log("Token supplied. Update token value in secret store.")
             Settings.data("token", Settings.option("token"))
         } else {
+            console.log("Token blank. Continue to use secret stored value")
             Settings.option("token", Settings.data("token"))
         }
         
-        hass.init(Settings.option("url"), Settings.option("token"))
+        if (config.requestConfig) { 
+            //First time set config, refresh menu
+            console.log("Refresh landing menu")
+            config.requestConfig = false
+            go()
+        } else {
+            //Change config, silent update
+            hass.init(Settings.option("url"), Settings.option("token"))
+        }
       }
     }
   );
@@ -262,7 +331,7 @@ function renderStatesMenu(data, filter) {
         entityType = entityType.replace("media_player", "switch")
         entityType = entityType.replace("timer", "switch")
 
-        if (entityType.indexOf(filter) != -1 && entityBlacklist.indexOf(entity.entity_id) == -1 && (config.hideUnavailable == false || entity.state != "unavailable")) {
+        if (entityType.indexOf(filter) != -1 && entityBlacklist.indexOf(entity.entity_id) == -1 && (Settings.option("hideUE") == false || entity.state != "unavailable")) {
 
             //White/Blacklist stuff
             if (filter == "sensor") {
@@ -361,6 +430,16 @@ function renderStatesMenu(data, filter) {
                     "unavailable": "IMAGE_ICON_UNAVAILABLE"
                 }[entity.state]
 
+            } else if (entity.type == "script") {
+
+                icon = "IMAGE_ICON_SCRIPT"
+
+                subtitle = ""
+                if (title.length > 11) {
+                    title = entity.attributes.friendly_name.substr(0, 11) + ".."
+                    subtitle = ".." + entity.attributes.friendly_name.trim().substr(11)
+                }
+
             } else if (entity.type == "timer") {
 
                 subtitle = entity.state
@@ -419,9 +498,14 @@ function renderStatesMenu(data, filter) {
         var originalSubtitle = e.item.subtitle
 
         //Entities to NOT replace subtitle with ... on click
-        var noElipsis = ["media_player"]
+        var noElipsis = ["media_player","script"]
         if (noElipsis.indexOf(getEntityClass(menuPosToEntity[e.itemIndex].entity_id)) == -1) {
             mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: '...' });
+        }
+        if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "script") {
+            if (config.enableIcons) {
+                mainMenu.item(0, e.itemIndex, { icon: "IMAGE_ICON_UNKNOWN" });
+            }
         }
 
 
@@ -579,6 +663,17 @@ function renderStatesMenu(data, filter) {
 
             showMediaControllerWindow(menuPosToEntity[e.itemIndex])            
 
+        } else if (filter == "script") {
+            console.log("Trigger script")
+            hass.toggle(menuPosToEntity[e.itemIndex], function(data, itemIndex) {
+                
+                console.log("Got this back: " + JSON.stringify(data))
+                
+                var o = { title: e.item.title, subtitle: e.item.subtitle }
+                if (config.enableIcons) { o.icon = "IMAGE_ICON_SCRIPT" }
+                mainMenu.item(0, e.itemIndex, o);
+
+            }, e.itemIndex)
         }
 
     });
@@ -654,48 +749,6 @@ function renderStatesMenu(data, filter) {
 
     mainMenu.selection(0, 0);
 
-}
-
-function updateMainMenuEntity(entity) {
-    //Call this function when returning to the mainMenu to update the entity state of a specific item
-    console.log("Update state of mainMenu entity " + entity.entity_id)
-    for (var i = 0; i < menuPosToEntity.length; i++) {
-        if (menuPosToEntity[i].entity_id == entity.entity_id) {
-            //We have located the position in the menu of the entity to update
-            //Determine the data format based on entity type
-            console.log("Located menu position of " + entity.entity_id + ": " + i)
-
-            var updateObj = {};
-            var etype = getEntityClass(entity.entity_id)
-
-            if (etype == "light") {
-
-                updateObj = {
-                    title: entity.attributes.friendly_name,
-                    subtitle: entity.state
-                }
-                if (entity.state == "on" && entity.attributes.hasOwnProperty("brightness")) {
-                    var bri = parseInt(entity.attributes.brightness);
-                    bri = bri / 255 * 100;
-                    updateObj.subtitle += " (" + Math.ceil(bri) + "%)"
-                }
-                if (config.enableIcons) {
-                    if (entity.state == "on") {
-                        updateObj.icon = "IMAGE_ICON_BULB_ON"
-                    } else {
-                        updateObj.icon = "IMAGE_ICON_BULB"
-                    }
-                }
-
-            }
-
-            //Update menu
-            console.log("Update mainMenu index " + i + " to " + JSON.stringify(updateObj))
-            mainMenu.item(0, i, updateObj);
-            break;
-
-        }
-    }
 }
 
 function showSensorDetailWindow(_title, _value, _icon, _extraData, entity) {
@@ -806,14 +859,14 @@ function showMediaControllerWindow(mediaPlayer) {
         });
     
         var mediaIcon = new UI.Image({
-            position: new Vector(6, 115),
+            position: Feature.round(new Vector(40, 110),new Vector(6, 115)),
             size: new Vector(25, 25),
             compositing: "set",
             backgroundColor: 'transparent',
             image: "IMAGE_ICON_MEDIA"
         });
         var muteIcon = new UI.Image({
-            position: new Vector(9, 80),
+            position: Feature.round(new Vector(9, 80),new Vector(9, 80)),
             size: new Vector(25, 25),
             compositing: "set",
             backgroundColor: 'transparent',
@@ -833,24 +886,24 @@ function showMediaControllerWindow(mediaPlayer) {
         });
 
         var progress_bg = new UI.Line({
-            position: new Vector(10, 105),
-            position2: new Vector(134 - Feature.actionBarWidth(), 105),
+            position: Feature.round(new Vector(20, 105), new Vector(10, 105)),
+            position2: Feature.round(new Vector(180 - Feature.actionBarWidth(), 105), new Vector(134 - Feature.actionBarWidth(), 105)),
             strokeColor: 'black',
             strokeWidth: 5,
         });
         var progress_bg_inner = new UI.Line({
-            position: new Vector(10, 105),
-            position2: new Vector(134 - Feature.actionBarWidth(), 105),
+            position: Feature.round(new Vector(20, 105), new Vector(10, 105)),
+            position2: Feature.round(new Vector(180 - Feature.actionBarWidth(), 105), new Vector(134 - Feature.actionBarWidth(), 105)),
             strokeColor: 'white',
             strokeWidth: 3,
         });
         var progress_fg = new UI.Line({
-            position: new Vector(10, 105),
-            position2: new Vector(10, 105),
+            position: Feature.round(new Vector(20, 105), new Vector(10, 105)),
+            position2: Feature.round(new Vector(20, 105), new Vector(10, 105)),
             strokeColor: 'black',
             strokeWidth: 3,
         });
-        progress_fg.maxWidth = 134 - Feature.actionBarWidth() - 10
+        progress_fg.maxWidth = Feature.round(170,134) - Feature.actionBarWidth() - 10
           
 
         wind_mediaControl.on('click', 'select', function(e) {
@@ -916,8 +969,8 @@ function showMediaControllerWindow(mediaPlayer) {
         
         if (config.enableIcons && Feature.rectangle()) { 
             wind_mediaControl.add(mediaIcon); 
-            wind_mediaControl.add(muteIcon)
         }
+        wind_mediaControl.add(muteIcon)
         // if (extraData != null && extraData != "") { wind_mediaControl.add(mediaExtraDeets); }
         // wind_mediaControl.add(sensorValue);
         wind_mediaControl.add(progress_bg);
@@ -962,6 +1015,9 @@ function refreshMediaProgress(textbox, progress, muteIcon, window, mediaPlayer) 
         })
     
         var x2 = progress.position().x + (parseInt(progress.maxWidth) * parseFloat(mediaPlayer.attributes.volume_level))
+        if (mediaPlayer.attributes.is_volume_muted) {
+            x2 = progress.position().x
+        }
         progress.animate('position2', new Vector(x2, progress.position2().y), 500)
 
         if (mediaPlayer.attributes.is_volume_muted) {
@@ -1589,7 +1645,7 @@ function showLightDetailWindow(entity) {
     wind_lightDetail.add(brightnessUI.hide_temperature);
 
 
-    if (config.ux.hasChangedLightOperationsBefore == false && (entity.meta.supportsTemperature)) { wind_lightDetail.add(brightnessUI.ux_explain) }
+    if (Settings.data("hasChangedLightOperationsBefore") == false && (entity.meta.supportsTemperature)) { wind_lightDetail.add(brightnessUI.ux_explain) }
     wind_lightDetail.show();
 
     //Get fresh data
@@ -1679,8 +1735,8 @@ function showLightDetailWindow(entity) {
         if (brightnessUI.activeEntity.meta.supportsTemperature == false && brightnessMenuActiveItem > 0) { brightnessMenuActiveItem = 0 }
         // if (brightnessUI.activeEntity.meta.supportsRGB == false && brightnessMenuActiveItem > 1) { brightnessMenuActiveItem = 0 }
         if (brightnessMenuActiveItem > 1) { brightnessMenuActiveItem = 0 }
-        if (config.ux.hasChangedLightOperationsBefore == false && brightnessUI.activeEntity.meta.supportsTemperature) {
-            config.ux.hasChangedLightOperationsBefore = true;
+        if (Settings.data("hasChangedLightOperationsBefore") == false && brightnessUI.activeEntity.meta.supportsTemperature) {
+            Settings.data("hasChangedLightOperationsBefore",true);
             brightnessUI.ux_explain.animate({
                 position: new Vector(brightnessUI.ux_explain.position()[0], 200)
             }, 1000)
@@ -1709,12 +1765,7 @@ function showLightDetailWindow(entity) {
             })
             //Hack);
     });
-    // wind_lightDetail.on('click', 'back', function() {
-    //     console.log("Back button pressed. Refresh selected entity");
-    //     wind_lightDetail.hide();
-    //     brightnessMenuActiveItem = 0;
-    //     hass.refresh(entity, updateMainMenuEntity);
-    // });
+
 }
 
 function getCleanedState(entity) {

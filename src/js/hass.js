@@ -1,14 +1,10 @@
 var ajax = require('ajax');
 var UI = require('ui');
-var tempAuth = require("./hackyTempAuth");
 
 var env = {
     token: "",
     serverAddress: ""
 }
-
-//Here until I get settings up and running:
-env.token = tempAuth.issue()
 
 function init(url, token) {
     console.log("Init hass runtime, using instance @ " + url)
@@ -45,7 +41,7 @@ function makePostRequest(path, data, cb) {
 function genericNetworkFail(e) {
     var ohno = new UI.Card({
         title: 'Uh Oh',
-        body: 'Failed to talk to Home Assistant at ' + env.serverAddress + ". \nCheck address & token?",
+        body: 'Failed to talk to Home Assistant at ' + env.serverAddress + ". \nCheck address & token in settings.",
         style: "small",
         scrollable: false
     });
