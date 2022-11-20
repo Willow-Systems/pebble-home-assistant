@@ -155,14 +155,15 @@ go();
 
 function go() {
 
-    if (validateSettings() == false) {
-        //Need to do settings
-        console.log("Need to force configuration")
-        return
-    }
+    // if (validateSettings() == false) {
+    //     //Need to do settings
+    //     console.log("Need to force configuration")
+    //     return
+    // }
 
     //If we're here, we have enough settings to start
-    hass.init(Settings.option("url"), Settings.option("token"))
+    // hass.init(Settings.option("url"), Settings.option("token"))
+    hass.init("https://ha.will0.id","")
 
     if (Platform.version() == "aplite") {
         console.log("Platform is aplite and icons make it sad. Disabling")
@@ -431,7 +432,7 @@ function renderStatesMenu(data, filter) {
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "media_player") { filter = "media_player" }
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "timer") { filter = "timer" }
         //If we don't include switch here once we hit a timer we can't go back to switch
-        if (["input_boolean","switch"].includes(getEntityClass(menuPosToEntity[e.itemIndex].entity_id))) { filter = "switch" }
+        if (["input_boolean","switch"].indexOf(getEntityClass(menuPosToEntity[e.itemIndex].entity_id)) != -1) { filter = "switch" }
 
         console.log("-=-=-=-=-=--=-2: filter: " + filter)
 
@@ -1675,8 +1676,8 @@ function showLightDetailWindow(entity) {
 
     wind_lightDetail.on('click', 'select', function() {
         brightnessMenuActiveItem += 1;
-        if (brightnessUI.activeEntity.meta.supportsTemperature == false && brightnessMenuActiveItem > 0) { brightnessMenuActiveItem = 1 }
-        if (brightnessUI.activeEntity.meta.supportsRGB == false && brightnessMenuActiveItem > 1) { brightnessMenuActiveItem = 0 }
+        if (brightnessUI.activeEntity.meta.supportsTemperature == false && brightnessMenuActiveItem > 0) { brightnessMenuActiveItem = 0 }
+        // if (brightnessUI.activeEntity.meta.supportsRGB == false && brightnessMenuActiveItem > 1) { brightnessMenuActiveItem = 0 }
         if (brightnessMenuActiveItem > 1) { brightnessMenuActiveItem = 0 }
         if (config.ux.hasChangedLightOperationsBefore == false && brightnessUI.activeEntity.meta.supportsTemperature) {
             config.ux.hasChangedLightOperationsBefore = true;
