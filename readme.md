@@ -1,5 +1,5 @@
 # Home Assistant for Pebble
-(Release name pending)
+![](/screenshots/banner.png)
 
 ## About
 This app works with [Home Assistant](http://hass.io) to let you control your smart home! It was made as part of the [Rebble Hackathon](https://rebble.io/hackathon-001)
