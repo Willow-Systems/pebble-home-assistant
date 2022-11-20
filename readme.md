@@ -35,6 +35,35 @@ There are only two 'Home Assistant' apps on the [Rebble app store](https://apps.
 ## Supported devices
 Support Pebble Time, Pebble Time Steel, Pebble Time Round and Pebble 2
 
+## Screenshots
+
+### Basalt
+![](/screenshots/basalt_1.png)
+![](/screenshots/basalt_2.png)
+![](/screenshots/basalt_3.png)
+![](/screenshots/basalt_4.png)
+![](/screenshots/basalt_5.png)
+![](/screenshots/basalt_6.png)
+![](/screenshots/basalt_7.png)
+
+### Chalk
+![](/screenshots/chalk_1.png)
+![](/screenshots/chalk_2.png)
+![](/screenshots/chalk_3.png)
+![](/screenshots/chalk_4.png)
+![](/screenshots/chalk_5.png)
+![](/screenshots/chalk_6.png)
+![](/screenshots/chalk_7.png)
+
+### Diorite
+![](/screenshots/diorite_1.png)
+![](/screenshots/diorite_2.png)
+![](/screenshots/diorite_3.png)
+![](/screenshots/diorite_4.png)
+![](/screenshots/diorite_5.png)
+![](/screenshots/diorite_6.png)
+![](/screenshots/diorite_7.png)
+
 ## Coming soon
 - More features, automation control, favourites, whitelisting etc.
 
