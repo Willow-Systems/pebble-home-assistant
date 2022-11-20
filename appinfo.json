@@ -147,6 +147,31 @@
         "file": "images/icon_muted.png",
         "name": "IMAGE_ICON_MUTED",
         "type": "png"
+      },
+      {
+        "file": "images/icon_timer.png",
+        "name": "IMAGE_ICON_TIMER",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_power.png",
+        "name": "IMAGE_ICON_POWER",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_pause.png",
+        "name": "IMAGE_ICON_PAUSE",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_stop.png",
+        "name": "IMAGE_ICON_STOP",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_play.png",
+        "name": "IMAGE_ICON_PLAY",
+        "type": "png"
       }
     ]
   },

@@ -1,15 +1,16 @@
 var ajax = require('ajax');
 var UI = require('ui');
-var tempAuth = require("./hackyTempAuth");
 
 var env = {
     token: "",
-    serverAddress: "https://ha.will0.id",
-    serverPort: 443
+    serverAddress: ""
 }
 
-//Here until I get settings up and running:
-env.token = tempAuth.issue()
+function init(url, token) {
+    console.log("Init hass runtime, using instance @ " + url)
+    env.serverAddress = url
+    env.token = token
+}
 
 function log(text, verboseOnly) {
     console.log(text)
@@ -17,12 +18,6 @@ function log(text, verboseOnly) {
 
 function _url() {
     var a = env.serverAddress;
-    // if ({
-    //   "http": 80,
-    //   "https": 443
-    // }[env.serverAddress.substr(0,6)] != serverPort) {
-    //   a += env.serverPort
-    // }
     return a
 }
 
@@ -46,18 +41,23 @@ function makePostRequest(path, data, cb) {
 function genericNetworkFail(e) {
     var ohno = new UI.Card({
         title: 'Uh Oh',
-        body: 'Failed to talk to Home Assistant',
+        body: 'Failed to talk to Home Assistant at ' + env.serverAddress + ". \nCheck address & token in settings.",
         style: "small",
         scrollable: false
     });
     console.log("oh no occured")
     console.log(e)
+    console.log(JSON.stringify(e))
     ohno.show();
 }
 
 function getStates(cb, filter) {
     log("Getting states", true);
     makeGetRequest("/states", cb, filter)
+}
+function getState(entity_id, cb) {
+    log("Getting state for " + entity_id, true);
+    makeGetRequest("/states/" + entity_id, cb)
 }
 
 function setLightBrightness(entity, brightness, cb) {
@@ -66,7 +66,9 @@ function setLightBrightness(entity, brightness, cb) {
         brightness: brightness
     }
     console.log("Making post request to brightness up");
-    makePostRequest("/services/light/turn_on", postData, cb)
+    makePostRequest("/services/light/turn_on", postData, function(d) {
+        cb_intercept(entity, cb, d)
+    })
 }
 
 function setLightTemperature(entity, temp, cb) {
@@ -75,7 +77,9 @@ function setLightTemperature(entity, temp, cb) {
         color_temp: temp
     }
     console.log("Making post request to change temp");
-    makePostRequest("/services/light/turn_on", postData, cb)
+    makePostRequest("/services/light/turn_on", postData, function(d) {
+        cb_intercept(entity, cb, d)
+    })
 }
 
 function playPause(entity, cb) {
@@ -124,7 +128,40 @@ function unmute(entity, cb) {
     makePostRequest(path, data, cb)
 }
 
+function timer_play(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id
+    };
+    var path = "/services/timer/start"
 
+    makePostRequest(path, data, cb)
+}
+function timer_pause(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id
+    };
+    var path = "/services/timer/pause"
+
+    makePostRequest(path, data, cb)
+    
+}
+function timer_stop(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id
+    };
+    var path = "/services/timer/finish"
+
+    makePostRequest(path, data, cb)
+    
+}
+function timer_cancel(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id
+    };
+    var path = "/services/timer/cancel"
+
+    makePostRequest(path, data, cb)
+}
 
 
 function toggle(entity, cb) {
@@ -137,9 +174,25 @@ function toggle(entity, cb) {
     entity.type = entity.entity_id.split(".")[0];
     var path = "/services/" + entity.type + "/toggle"
 
-    makePostRequest(path, data, cb)
-    cb()
+    makePostRequest(path, data, function(d) {
+        cb_intercept(entity, cb, d)
+    })
+    // cb()
 
+}
+function cb_intercept(entity, cb, d) {
+    //Okay so what _should_ happen is makePostRequest in toggle() should just pass a callback
+    //But recently home assistant stopped returning the changed state for some reason
+    //So instead we come here first, and if we don't have the changed state, request the state and THEN go to the original cb()
+    console.log("toggle_cb_intercept( entity:" + JSON.stringify(entity) + " d: " + JSON.stringify(d))
+
+    if (JSON.stringify(d) == "[]") {
+        //We need to get the state
+        console.log("Manually get new state for " + entity.entity_id)
+        makeGetRequest("/states/" + entity.entity_id, cb, null)
+    } else {
+        cb(d)
+    }
 }
 
 function refresh(entity, cb) {
@@ -151,7 +204,9 @@ function refresh(entity, cb) {
 
 }
 
+module.exports.init = init
 module.exports.getStates = getStates;
+module.exports.getState = getState;
 module.exports.toggle = toggle;
 module.exports.refresh = refresh;
 module.exports.setLightBrightness = setLightBrightness;
@@ -161,3 +216,8 @@ module.exports.volume_up = volume_up
 module.exports.volume_down = volume_down
 module.exports.mute = mute
 module.exports.unmute = unmute
+module.exports.timer_play = timer_play
+module.exports.timer_pause = timer_pause
+module.exports.timer_stop = timer_stop
+module.exports.timer_cancel = timer_cancel
+
