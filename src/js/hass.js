@@ -163,6 +163,30 @@ function timer_cancel(entity, cb) {
     makePostRequest(path, data, cb)
 }
 
+function vacuum_start(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id
+    };
+    var path = "/services/vacuum/start"
+
+    makePostRequest(path, data, cb)
+}
+function vacuum_pause(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id
+    };
+    var path = "/services/vacuum/pause"
+
+    makePostRequest(path, data, cb)
+}
+function vacuum_return_to_base(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id
+    };
+    var path = "/services/vacuum/return_to_base"
+
+    makePostRequest(path, data, cb)
+}
 
 function toggle(entity, cb) {
 
@@ -220,4 +244,7 @@ module.exports.timer_play = timer_play
 module.exports.timer_pause = timer_pause
 module.exports.timer_stop = timer_stop
 module.exports.timer_cancel = timer_cancel
+module.exports.vacuum_start = vacuum_start
+module.exports.vacuum_pause = vacuum_pause
+module.exports.vacuum_return_to_base = vacuum_return_to_base
 
