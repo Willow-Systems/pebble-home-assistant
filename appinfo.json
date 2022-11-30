@@ -172,19 +172,34 @@
         "file": "images/icon_play.png",
         "name": "IMAGE_ICON_PLAY",
         "type": "png"
+      },
+      {
+        "file": "images/icon_script.png",
+        "name": "IMAGE_ICON_SCRIPT",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_vacuum.png",
+        "name": "IMAGE_ICON_VACUUM",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_home.png",
+        "name": "IMAGE_ICON_HOME",
+        "type": "png"
       }
     ]
   },
   "sdkVersion": "3",
-  "shortName": "Hass.io",
+  "shortName": "H.A.",
   "targetPlatforms": [
     "basalt",
     "chalk",
     "diorite"
   ],
   "uuid": "e72aed38-ceda-412b-bb20-3f606494cd1a",
-  "versionCode": 1,
-  "versionLabel": "1.0",
+  "versionCode": 1.1,
+  "versionLabel": "1.1",
   "watchapp": {
     "watchface": false
   }

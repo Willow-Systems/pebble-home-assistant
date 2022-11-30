@@ -7,7 +7,7 @@ var Feature = require('platform/feature');
 var Platform = require('platform');
 var hass = require('./hass.js');
 var Vibe = require('ui/vibe');
-var version = "1.0"
+var version = "1.1"
 
 var emulator_hax = false;
 var always_reset_settings_hax = false;
@@ -172,6 +172,7 @@ function renderHomeMenu(hasConfig) {
         // if (config.showMediaPlayers) { homeItems.push({ title: "Media Players" }) }
         if (config.showAutomations) { homeItems.push({ title: "Automations" }) }
         if (config.showScripts) {homeItems.push({ title: "Scripts" }) }
+        if (false) {homeItems.push({ title: "Scenes" }) }
         homeItems.push({ title: "About"})
 
         homeMenu.on('select', function(e) {
@@ -187,6 +188,8 @@ function renderHomeMenu(hasConfig) {
                 hass.getStates(renderStatesMenu, "automation");
             } else if (e.item.title.toLowerCase() == "scripts") {
                 hass.getStates(renderStatesMenu, "script");
+            } else if (e.item.title.toLowerCase() == "scenes") {
+                hass.getStates(renderStatesMenu, "scene");
             } else if (e.item.title.toLowerCase() == "about") {
                 showAboutScreen()
             }
@@ -330,6 +333,7 @@ function renderStatesMenu(data, filter) {
         entityType = entityType.replace("input_boolean", "switch")
         entityType = entityType.replace("media_player", "switch")
         entityType = entityType.replace("timer", "switch")
+        entityType = entityType.replace("vacuum", "switch")
 
         if (entityType.indexOf(filter) != -1 && entityBlacklist.indexOf(entity.entity_id) == -1 && (Settings.option("hideUE") == false || entity.state != "unavailable")) {
 
@@ -435,15 +439,35 @@ function renderStatesMenu(data, filter) {
                 icon = "IMAGE_ICON_SCRIPT"
 
                 subtitle = ""
-                if (title.length > 11) {
-                    title = entity.attributes.friendly_name.substr(0, 11) + ".."
-                    subtitle = ".." + entity.attributes.friendly_name.trim().substr(11)
+                if (title.length > 12) {
+                    title = entity.attributes.friendly_name.substr(0, 12) + ".."
+                    subtitle = ".." + entity.attributes.friendly_name.trim().substr(12)
+                }
+
+            } else if (entity.type == "script") {
+
+                icon = "IMAGE_ICON_SCRIPT"
+
+                subtitle = ""
+                if (title.length > 12) {
+                    title = entity.attributes.friendly_name.substr(0, 12) + ".."
+                    subtitle = ".." + entity.attributes.friendly_name.trim().substr(12)
+                }
+
+            } else if (entity.type == "scene") {
+
+                icon = "IMAGE_ICON_SCRIPT"
+
+                subtitle = ""
+                if (title.length > 12) {
+                    title = entity.attributes.friendly_name.substr(0, 12) + ".."
+                    subtitle = ".." + entity.attributes.friendly_name.trim().substr(12)
                 }
 
             } else if (entity.type == "timer") {
 
                 subtitle = entity.state
-                if (title.length > 11) {
+                if (title.length > 12) {
                     title = entity.attributes.friendly_name.substr(0, 11) + ".."
                 }
                 icon = "IMAGE_ICON_TIMER"
@@ -453,6 +477,14 @@ function renderStatesMenu(data, filter) {
                 if (entity.state == "paused") {
                     friendlyRemaining("Paused (" + entity.attributes.finishes_at + ")")
                 }
+            
+            } else if (entity.type == "vacuum") {
+
+                subtitle = entity.state
+                if (title.length > 12) {
+                    title = entity.attributes.friendly_name.substr(0, 12) + ".."
+                }
+                icon = "IMAGE_ICON_VACUUM"
 
             } else {
                 console.log(JSON.stringify(entity))
@@ -515,6 +547,7 @@ function renderStatesMenu(data, filter) {
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "cover") { filter = "cover" }
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "media_player") { filter = "media_player" }
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "timer") { filter = "timer" }
+        if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "vacuum") { filter = "vacuum" }
         //If we don't include switch here once we hit a timer we can't go back to switch
         if (["input_boolean","switch"].indexOf(getEntityClass(menuPosToEntity[e.itemIndex].entity_id)) != -1) { filter = "switch" }
 
@@ -657,6 +690,24 @@ function renderStatesMenu(data, filter) {
                 mainMenu.item(0, e.itemIndex, o);
 
             })
+
+        } else if (filter == "vacuum") {
+
+            hass.refresh(menuPosToEntity[e.itemIndex], function(data) {
+
+                console.log("Got this back: " + JSON.stringify(data))
+                //Update cache
+                menuPosToEntity[itemIndex] = data
+
+                //This code repeats and that's terrible. I should feel bad. Need to fix this later
+                var icon = "IMAGE_ICON_VACUUM"
+                var subtitle = data.state
+
+                var o = { title: e.item.title, subtitle: subtitle }
+                if (config.enableIcons) { o.icon = icon }
+                mainMenu.item(0, e.itemIndex, o);
+
+            })
         
         } else if (filter == "media_player") {
             console.log("Short press media player")
@@ -685,6 +736,7 @@ function renderStatesMenu(data, filter) {
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "cover") { filter = "cover" }
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "media_player") { filter = "media_player" }
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "timer") { filter = "timer" }
+        if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "vacuum") { filter = "vacuum" }
 
         if (["cover", "sensor", "switch", "media_player"].indexOf(filter) != -1) {
             var s = menuPosToEntity[e.itemIndex];
@@ -739,6 +791,11 @@ function renderStatesMenu(data, filter) {
 
             var s = menuPosToEntity[e.itemIndex];
             showTimerDetailWindow(s);
+
+        } else if (filter == "vacuum") {
+
+            var s = menuPosToEntity[e.itemIndex];
+            showVacuumDetailWindow(s)
 
         } else {
             console.log("Unimplemented");
@@ -1207,6 +1264,106 @@ if (timer.state == "active") {
     statusTextbox.text(timer.state)
     progressTextbox.text(" ");
 }
+}
+
+function showVacuumDetailWindow(entity) {
+
+    wind_vacuumControl = new UI.Window({
+        status: {
+            color: 'black',
+            backgroundColor: 'white',
+            seperator: "dotted"
+        },
+        backgroundColor: "white",
+        action: {
+            up: "IMAGE_ICON_PLAY",
+            select: "IMAGE_ICON_PAUSE",
+            down: "IMAGE_ICON_HOME",
+        }
+    });
+
+    var titleFont = "gothic_24_bold"
+    var titleY = 3
+    if (entity.attributes.friendly_name.length > 17) {
+        titleFont = "gothic_14_bold"
+        titleY = 6
+    }
+    var vacName = new UI.Text({
+        text: entity.attributes.friendly_name,
+        color: Feature.color(colour.highlight, "black"),
+        font: titleFont,
+        position: Feature.round(new Vector(10, titleY), new Vector(5, titleY)),
+        size: Feature.round(new Vector(160, 30), new Vector(129, 30)),
+        textAlign: Feature.round("center", "left")
+    });
+
+    var vacText = ""
+
+    if (entity.attributes.hasOwnProperty("status")) { vacText = vacText + entity.attributes.status + "\n\n" }
+    if (entity.attributes.hasOwnProperty("fan_speed")) { vacText = vacText + "Fan: " + entity.attributes.fan_speed + "\n" }
+    if (entity.attributes.hasOwnProperty("battery_level")) { vacText = vacText + "Battery: " + entity.attributes.battery_level + "%\n" }
+
+    var vacStatus = new UI.Text({
+        text: vacText,
+        color: 'black',
+        font: "gothic_14_bold",
+        position: Feature.round(new Vector(10, 35), new Vector(5, 35)),
+        size: Feature.round(new Vector(180, 50), new Vector(150, 50)),
+        textAlign: Feature.round("center", "left")
+    });
+
+
+    var vacIcon = new UI.Image({
+        position: new Vector(6, 115),
+        size: new Vector(25, 25),
+        compositing: "set",
+        backgroundColor: 'transparent',
+        image: "IMAGE_ICON_VACUUM"
+    });
+
+    wind_vacuumControl.on('click', 'up', function(e) {
+        hass.vacuum_start(entity, function(){
+            refreshVacuumDetailWindow(vacStatus, entity.entity_id)
+        })
+    });
+
+    wind_vacuumControl.on('click', 'select', function(e) {
+        hass.vacuum_pause(entity, function(){
+            refreshVacuumDetailWindow(vacStatus, entity.entity_id)
+        })
+    });
+
+    wind_vacuumControl.on('click', 'down', function(e) {
+        hass.vacuum_return_to_base(entity, function(){
+            refreshVacuumDetailWindow(vacStatus, entity.entity_id)
+        })
+    });
+
+    // if (extraData != null && extraData != "") { wind_mediaControl.add(mediaExtraDeets); }
+    // wind_mediaControl.add(sensorValue);
+    wind_vacuumControl.add(vacStatus);
+    wind_vacuumControl.add(vacName);
+    wind_vacuumControl.add(vacIcon);
+    wind_vacuumControl.show();
+
+    var refreshTimer = setInterval(function() {
+        refreshVacuumDetailWindow(vacStatus, entity.entity_id)
+    }, 10000);
+    wind_vacuumControl.on('hide', function(e) {
+        console.log("Clear interval")
+        clearInterval(refreshTimer)
+    });
+}
+function refreshVacuumDetailWindow(statusLabel, entity_id) {
+    hass.getState(entity_id, function(entity) {
+        var vacText = ""
+
+        if (entity.attributes.hasOwnProperty("status")) { vacText = vacText + entity.attributes.status + "\n\n" }
+        if (entity.attributes.hasOwnProperty("fan_speed")) { vacText = vacText + "Fan: " + entity.attributes.fan_speed + "\n" }
+        if (entity.attributes.hasOwnProperty("battery_level")) { vacText = vacText + "Battery: " + entity.attributes.battery_level + "%\n" }
+        statusLabel.text(vacText)
+    })
+
 }
 
 function updateBrightness(entity, brightness) {
