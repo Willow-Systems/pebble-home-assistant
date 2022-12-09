@@ -139,7 +139,7 @@ function go() {
 
     if (emulator_hax == true) {
 
-        hass.init("https://ha.will0.id","")
+        hass.init("$INSTANCE","$KEY");
 
     } else {
 
