@@ -19,6 +19,7 @@ There are only two 'Home Assistant' apps on the [Rebble app store](https://apps.
   - Quickly toggle switches
   - Control media player (volume/play/pause/power)
   - Control timers (view/start/stop/pause)
+  - Control vacuums (start/stop/return to home)
 - Sensors:
   - View sensors and their values
   - Go into extra details to see all attributes
@@ -34,6 +35,17 @@ There are only two 'Home Assistant' apps on the [Rebble app store](https://apps.
 
 ## Supported devices
 Support Pebble Time, Pebble Time Steel, Pebble Time Round and Pebble 2
+
+## Supported home assistant entity types:
+- light
+- switch
+- cover
+- input_boolean
+- timer
+- media_player
+- vacuum
+- script
+- sensor
 
 ## Screenshots
 
