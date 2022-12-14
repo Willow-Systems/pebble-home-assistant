@@ -26,6 +26,8 @@ There are only two 'Home Assistant' apps on the [Rebble app store](https://apps.
   - Quickly refresh their values
 - Scripts:
   - View and trigger scripts
+- Scenes:
+  - View and trigger scenes
 
 ## How to:
 - Have a Pebble setup [with Rebble](https://help.rebble.io/setup)
