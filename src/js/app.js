@@ -7,13 +7,16 @@ var Feature = require('platform/feature');
 var Platform = require('platform');
 var hass = require('./hass.js');
 var Vibe = require('ui/vibe');
-var version = "1.1"
+var version = "1.2"
 
 var emulator_hax = false;
 var always_reset_settings_hax = false;
 var clear_all_hax = false;
+var use_beta_settings_hax = false;
+
 var analytics_ok = true;
 setSettingsToDefaultIfRequired(false);
+bringSettingsUpToDate();
 
 var entityBlacklist = [];
 
@@ -48,6 +51,7 @@ function setSettingsToDefaultIfRequired(force) {
         Settings.data('ui_show_sensors', true);
         Settings.data('ui_show_automations', false);
         Settings.data('ui_show_scripts', true)
+        Settings.data('ui_show_scenes', true)
         Settings.data('hasChangedLightOperationsBefore', false)
         Settings.data('welcomeScreen', false)
         Settings.option("hideUE", true)
@@ -58,6 +62,12 @@ function setSettingsToDefaultIfRequired(force) {
         Settings.option("url", null)
         Settings.option("hideUE", null)
     }
+}
+function bringSettingsUpToDate() {
+    //If we add a new setting in an update, set it to it's default here
+
+    //1.2:
+    if (Settings.data('ui_show_scenes') == null) { Settings.data('ui_show_scenes', true) }
 }
 
 //Unused rn
@@ -140,6 +150,7 @@ function go() {
     if (emulator_hax == true) {
 
         hass.init("$INSTANCE","$KEY");
+        renderHomeMenu(true)
 
     } else {
 
@@ -172,7 +183,7 @@ function renderHomeMenu(hasConfig) {
         // if (config.showMediaPlayers) { homeItems.push({ title: "Media Players" }) }
         if (config.showAutomations) { homeItems.push({ title: "Automations" }) }
         if (config.showScripts) {homeItems.push({ title: "Scripts" }) }
-        if (false) {homeItems.push({ title: "Scenes" }) }
+        if (Settings.data('ui_show_scenes')) { homeItems.push({ title: "Scenes" }) }
         homeItems.push({ title: "About"})
 
         homeMenu.on('select', function(e) {
@@ -278,8 +289,7 @@ function validateSettings() {
     console.log("Minimum settings present. Good to go.")
     return true
 }
-Settings.config(
-    { url: 'http://willow.systems/pebble/configs/hassio' },
+Settings.config({ url: getConfigURL() },
     function(e) {
       console.log('closed configurable');
   
@@ -311,7 +321,14 @@ Settings.config(
         }
       }
     }
-  );
+);
+function getConfigURL() {
+    if (use_beta_settings_hax) {
+        return "https://willow.systems/pebble/configs/hassio/beta.html"
+    } else {
+        return "https://willow.systems/pebble/configs/hassio"
+    }
+}
 
 function renderStatesMenu(data, filter) {
     console.log("Filter: " + filter);
@@ -444,19 +461,9 @@ function renderStatesMenu(data, filter) {
                     subtitle = ".." + entity.attributes.friendly_name.trim().substr(12)
                 }
 
-            } else if (entity.type == "script") {
-
-                icon = "IMAGE_ICON_SCRIPT"
-
-                subtitle = ""
-                if (title.length > 12) {
-                    title = entity.attributes.friendly_name.substr(0, 12) + ".."
-                    subtitle = ".." + entity.attributes.friendly_name.trim().substr(12)
-                }
-
             } else if (entity.type == "scene") {
 
-                icon = "IMAGE_ICON_SCRIPT"
+                icon = "IMAGE_ICON_SCENE"
 
                 subtitle = ""
                 if (title.length > 12) {
@@ -530,7 +537,7 @@ function renderStatesMenu(data, filter) {
         var originalSubtitle = e.item.subtitle
 
         //Entities to NOT replace subtitle with ... on click
-        var noElipsis = ["media_player","script"]
+        var noElipsis = ["media_player","script", "scene"]
         if (noElipsis.indexOf(getEntityClass(menuPosToEntity[e.itemIndex].entity_id)) == -1) {
             mainMenu.item(0, e.itemIndex, { title: e.item.title, subtitle: '...' });
         }
@@ -564,6 +571,7 @@ function renderStatesMenu(data, filter) {
 
                 if (data.constructor == Array) {
                     //Sometimes the data will return an array of updated entities. We only care about our own.
+                    // console.log("Extract single blob from array")
                     for (var i = 0; i < data.length; i++) {
                         var entity = data[i];
                         if (getEntityClass(entity.entity_id) != "group" && entity.entity_id == menuPosToEntity[e.itemIndex].entity_id) {
@@ -725,6 +733,18 @@ function renderStatesMenu(data, filter) {
                 mainMenu.item(0, e.itemIndex, o);
 
             }, e.itemIndex)
+        } else if (filter == "scene") {
+            console.log("Trigger scene")
+            hass.scene_activate(menuPosToEntity[e.itemIndex], function(data) {
+                
+                console.log("Got this back: " + JSON.stringify(data))
+                Vibe.vibrate('short')
+                
+                // var o = { title: e.item.title, subtitle: e.item.subtitle }
+                // if (config.enableIcons) { o.icon = "IMAGE_ICON_SCRIPT" }
+                // mainMenu.item(0, e.itemIndex, o);
+
+            })
         }
 
     });
