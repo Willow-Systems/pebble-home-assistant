@@ -188,6 +188,15 @@ function vacuum_return_to_base(entity, cb) {
     makePostRequest(path, data, cb)
 }
 
+function scene_activate(entity, cb) {
+    var data = {
+        entity_id: entity.entity_id
+    };
+    var path = "/services/scene/turn_on"
+
+    makePostRequest(path, data, cb)
+}
+
 function toggle(entity, cb) {
 
     console.log("[hass] Toggle device " + entity.entity_id)
@@ -247,4 +256,4 @@ module.exports.timer_cancel = timer_cancel
 module.exports.vacuum_start = vacuum_start
 module.exports.vacuum_pause = vacuum_pause
 module.exports.vacuum_return_to_base = vacuum_return_to_base
-
+module.exports.scene_activate = scene_activate
