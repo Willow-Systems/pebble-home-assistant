@@ -758,7 +758,7 @@ function renderStatesMenu(data, filter) {
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "timer") { filter = "timer" }
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "vacuum") { filter = "vacuum" }
 
-        if (["cover", "sensor", "switch", "media_player"].indexOf(filter) != -1) {
+        if (["cover", "sensor", "switch", "media_player", "scene", "script"].indexOf(filter) != -1) {
             var s = menuPosToEntity[e.itemIndex];
             console.log("Cached state: " + JSON.stringify(s))
 
@@ -835,14 +835,14 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData, entity) {
             backgroundColor: 'white',
             seperator: "dotted"
         },
-        scrollable: true,
-        height: 300,
+        // scrollable: true,
+        height: 600,
         backgroundColor: "white"
     });
 
     var titleFont = "gothic_24_bold"
     var titleY = 3
-    if (_title.length > 17) {
+    if (_title.length > 14) {
         titleFont = "gothic_14_bold"
         titleY = 6
     }
@@ -852,7 +852,8 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData, entity) {
         font: titleFont,
         position: Feature.round(new Vector(10, titleY), new Vector(5, titleY)),
         size: Feature.round(new Vector(160, 30), new Vector(139, 30)),
-        textAlign: Feature.round("center", "left")
+        textAlign: Feature.round("center", "left"),
+        textOverflow: "ellipsis"
     });
 
     if (config.enableIcons) {
@@ -867,8 +868,21 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData, entity) {
         });
     }
 
+    var sensorValueParsed = _value
+    try {
+        sensorValueParsed = new Date(sensorValueParsed)
+        if (sensorValueParsed == "Invalid Date") {
+            sensorValueParsed = _value
+        } else {
+            sensorValueParsed = friendlyLastChanged(_value)
+        }
+    } catch (e) {
+        console.log("Not a date")
+        sensorValueParsed = _value
+    }
+   
     var sensorValue = new UI.Text({
-        text: _value,
+        text: sensorValueParsed,
         color: "black",
         font: Feature.round("gothic_24_bold", "gothic_18_bold"),
         position: Feature.round(new Vector(10, 29), new Vector(5, 30)),
@@ -887,16 +901,31 @@ function showSensorDetailWindow(_title, _value, _icon, _extraData, entity) {
         });
     }
 
-    if (config.enableIcons && Feature.rectangle()) { wind_sensorDetail.add(sensorIcon); }
     if (_extraData != null && _extraData != "") { wind_sensorDetail.add(sensorExtraDeets); }
+    console.log(Feature.resolution().x)
+    wind_sensorDetail.add(new UI.Rect({
+        size: new Vector(Feature.resolution().x, 60),
+        position: new Vector(0, 0),
+        backgroundColor: "white"
+    }))
+    if (config.enableIcons && Feature.rectangle()) { wind_sensorDetail.add(sensorIcon); }
     wind_sensorDetail.add(sensorValue);
     wind_sensorDetail.add(sensorName);
     wind_sensorDetail.show();
 
-    // wind_sensorDetail.on('longClick', 'down', function(e) {
-    //     console.log("Toggle blacklist status for entityID: " + entity.entity_id);
-    //     blacklistMsg.text("HOld down to un-blacklist entity");
-    // });
+    // Custom scroll. A little hacky
+    wind_sensorDetail.on('click', 'down', function(e) {
+        sensorExtraDeets.animate({position: new Vector(sensorExtraDeets.position().x, sensorExtraDeets.position().y - 20)})
+    });
+    wind_sensorDetail.on('longClick', 'down', function(e) {
+        sensorExtraDeets.animate({position: new Vector(sensorExtraDeets.position().x, sensorExtraDeets.position().y - 50)})
+    });
+    wind_sensorDetail.on('click', 'up', function(e) {
+        sensorExtraDeets.animate({position: new Vector(sensorExtraDeets.position().x, sensorExtraDeets.position().y + 20)})
+    });
+    wind_sensorDetail.on('longClick', 'up', function(e) {
+        sensorExtraDeets.animate({position: new Vector(sensorExtraDeets.position().x, sensorExtraDeets.position().y + 50)})
+    });
 }
 
 function showMediaControllerWindow(mediaPlayer) {
