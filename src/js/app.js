@@ -1351,13 +1351,14 @@ function showVacuumDetailWindow(entity) {
     if (entity.attributes.hasOwnProperty("status")) { vacText = vacText + entity.attributes.status + "\n\n" }
     if (entity.attributes.hasOwnProperty("fan_speed")) { vacText = vacText + "Fan: " + entity.attributes.fan_speed + "\n" }
     if (entity.attributes.hasOwnProperty("battery_level")) { vacText = vacText + "Battery: " + entity.attributes.battery_level + "%\n" }
+    if (entity.attributes.hasOwnProperty("water_tank") && entity.attributes.water_tank == true) { vacText = vacText + "Water Tank 👍\n" }
 
     var vacStatus = new UI.Text({
         text: vacText,
         color: 'black',
         font: "gothic_14_bold",
         position: Feature.round(new Vector(10, 35), new Vector(5, 35)),
-        size: Feature.round(new Vector(180, 50), new Vector(150, 50)),
+        size: Feature.round(new Vector(180, 70), new Vector(150, 70)),
         textAlign: Feature.round("center", "left")
     });
 
@@ -1410,6 +1411,7 @@ function refreshVacuumDetailWindow(statusLabel, entity_id) {
         if (entity.attributes.hasOwnProperty("status")) { vacText = vacText + entity.attributes.status + "\n\n" }
         if (entity.attributes.hasOwnProperty("fan_speed")) { vacText = vacText + "Fan: " + entity.attributes.fan_speed + "\n" }
         if (entity.attributes.hasOwnProperty("battery_level")) { vacText = vacText + "Battery: " + entity.attributes.battery_level + "%\n" }
+        if (entity.attributes.hasOwnProperty("water_tank") && entity.attributes.water_tank == true) { vacText = vacText + "Water Tank 👍\n" }
         statusLabel.text(vacText)
     })
 
