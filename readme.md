@@ -20,6 +20,7 @@ There are only two 'Home Assistant' apps on the [Rebble app store](https://apps.
   - Control media player (volume/play/pause/power)
   - Control timers (view/start/stop/pause)
   - Control vacuums (start/stop/return to home)
+  - Control Locks (lock/unlock)
 - Sensors:
   - View sensors and their values
   - Go into extra details to see all attributes
@@ -46,6 +47,8 @@ Support Pebble Time, Pebble Time Steel, Pebble Time Round and Pebble 2
 - timer
 - media_player
 - vacuum
+- lock
+- scene
 - script
 - sensor
 

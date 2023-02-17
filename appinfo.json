@@ -192,6 +192,16 @@
         "file": "images/icon_scene.png",
         "name": "IMAGE_ICON_SCENE",
         "type": "png"
+      },
+      {
+        "file": "images/icon_locked.png",
+        "name": "IMAGE_ICON_LOCKED",
+        "type": "png"
+      },
+      {
+        "file": "images/icon_unlocked.png",
+        "name": "IMAGE_ICON_UNLOCKED",
+        "type": "png"
       }
     ]
   },
@@ -203,8 +213,8 @@
     "diorite"
   ],
   "uuid": "e72aed38-ceda-412b-bb20-3f606494cd1a",
-  "versionCode": 1.2,
-  "versionLabel": "1.2",
+  "versionCode": 1.3,
+  "versionLabel": "1.3",
   "watchapp": {
     "watchface": false
   }

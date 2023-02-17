@@ -197,6 +197,60 @@ function scene_activate(entity, cb) {
     makePostRequest(path, data, cb)
 }
 
+function lock(entity, cb) {
+
+    console.log("[hass] Lock device " + entity.entity_id)
+
+    var data = {
+        entity_id: entity.entity_id
+    };
+    entity.type = entity.entity_id.split(".")[0];
+    var path = "/services/" + entity.type + "/lock"
+
+    makePostRequest(path, data, function(d) {
+        cb_intercept(entity, cb, d)
+    })
+    // cb()
+
+}
+function unlock(entity, cb) {
+
+    console.log("[hass] Unlock device " + entity.entity_id)
+
+    var data = {
+        entity_id: entity.entity_id
+    };
+    entity.type = entity.entity_id.split(".")[0];
+    var path = "/services/" + entity.type + "/unlock"
+
+    makePostRequest(path, data, function(d) {
+        cb_intercept(entity, cb, d)
+    })
+    // cb()
+
+}
+function cust_toggle_lock(entity, cb) {
+    //Toggling a lock isn't a thing. We'll make it a thing
+
+    console.log("[hass] Custom toggle lock for device " + entity.entity_id)
+
+    makeGetRequest('/states/' + entity.entity_id, function(data) {
+
+        console.log("Current status: " + data.state)
+        if (data.state == "unlocked") {
+            lock(entity, cb)
+        } else if (data.state == "locked") {
+            unlock(entity, cb)
+        } else {
+            console.log("!=!=!=!=!=!=!=!=!=!")
+            console.log("[hass] Something went wrong")
+            console.log("[hass] Tried to toggle lock " + entity + " but current state is neither 'locked' nor 'unlocked'")
+            cb(entity)
+        }
+
+    })
+}
+
 function toggle(entity, cb) {
 
     console.log("[hass] Toggle device " + entity.entity_id)
@@ -257,3 +311,6 @@ module.exports.vacuum_start = vacuum_start
 module.exports.vacuum_pause = vacuum_pause
 module.exports.vacuum_return_to_base = vacuum_return_to_base
 module.exports.scene_activate = scene_activate
+module.exports.lock = lock
+module.exports.unlock = unlock
+module.exports.toggle_lock = cust_toggle_lock

@@ -7,7 +7,7 @@ var Feature = require('platform/feature');
 var Platform = require('platform');
 var hass = require('./hass.js');
 var Vibe = require('ui/vibe');
-var version = "1.2"
+var version = "1.3"
 
 var emulator_hax = false;
 var always_reset_settings_hax = false;
@@ -335,7 +335,7 @@ function renderStatesMenu(data, filter) {
     menuPosToEntity = [];
     var menuItemArray = [];
 
-    console.log(JSON.stringify(data))
+    //console.log(JSON.stringify(data))
 
     for (var i = 0; i < data.length; i++) {
 
@@ -351,6 +351,7 @@ function renderStatesMenu(data, filter) {
         entityType = entityType.replace("media_player", "switch")
         entityType = entityType.replace("timer", "switch")
         entityType = entityType.replace("vacuum", "switch")
+        entityType = entityType.replace("lock", "switch")
 
         if (entityType.indexOf(filter) != -1 && entityBlacklist.indexOf(entity.entity_id) == -1 && (Settings.option("hideUE") == false || entity.state != "unavailable")) {
 
@@ -395,6 +396,11 @@ function renderStatesMenu(data, filter) {
 
                 icon = "IMAGE_ICON_BLIND_CLOSED"
                 if (entity.state == "open") { icon = "IMAGE_ICON_BLIND_OPEN" }
+                subtitle = entity.state
+            } else if (entity.type == "lock") {
+                
+                icon = "IMAGE_ICON_UNLOCKED"
+                if (entity.state == "locked") { icon = "IMAGE_ICON_LOCKED" }
                 subtitle = entity.state
 
             } else if (entity.type == "sensor") {
@@ -555,6 +561,7 @@ function renderStatesMenu(data, filter) {
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "media_player") { filter = "media_player" }
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "timer") { filter = "timer" }
         if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "vacuum") { filter = "vacuum" }
+        if (getEntityClass(menuPosToEntity[e.itemIndex].entity_id) == "lock") { filter = "lock" }
         //If we don't include switch here once we hit a timer we can't go back to switch
         if (["input_boolean","switch"].indexOf(getEntityClass(menuPosToEntity[e.itemIndex].entity_id)) != -1) { filter = "switch" }
 
@@ -619,6 +626,30 @@ function renderStatesMenu(data, filter) {
                 
                 if (subtitle == "open") { icon = "IMAGE_ICON_BLIND_OPEN" }
                 if (subtitle == "closed") { icon = "IMAGE_ICON_BLIND_CLOSED" }
+
+                var o = { title: e.item.title, subtitle: subtitle }
+                if (config.enableIcons) { o.icon = icon }
+                mainMenu.item(0, e.itemIndex, o);
+
+            }, e.itemIndex)
+
+        } else if (filter == "lock") {
+
+            hass.toggle_lock(menuPosToEntity[e.itemIndex], function(data, itemIndex) {
+                
+                console.log("Got this back: " + JSON.stringify(data))
+
+                //Returns an array with 1 element sometimes. If it's an array, get just our object
+                if (data.constructor == Array) {
+			data = data[0]
+			console.log("Extract element from array: " + JSON.stringify(data))
+                }
+
+                subtitle = data.state
+                
+                icon = "IMAGE_ICON_UNKNOWN"
+                if (subtitle == "locked") { icon = "IMAGE_ICON_LOCKED" }
+                if (subtitle == "unlocked") { icon = "IMAGE_ICON_UNLOCKED" }
 
                 var o = { title: e.item.title, subtitle: subtitle }
                 if (config.enableIcons) { o.icon = icon }
@@ -1351,13 +1382,14 @@ function showVacuumDetailWindow(entity) {
     if (entity.attributes.hasOwnProperty("status")) { vacText = vacText + entity.attributes.status + "\n\n" }
     if (entity.attributes.hasOwnProperty("fan_speed")) { vacText = vacText + "Fan: " + entity.attributes.fan_speed + "\n" }
     if (entity.attributes.hasOwnProperty("battery_level")) { vacText = vacText + "Battery: " + entity.attributes.battery_level + "%\n" }
+    if (entity.attributes.hasOwnProperty("water_tank") && entity.attributes.water_tank == true) { vacText = vacText + "Water Tank 👍\n" }
 
     var vacStatus = new UI.Text({
         text: vacText,
         color: 'black',
         font: "gothic_14_bold",
         position: Feature.round(new Vector(10, 35), new Vector(5, 35)),
-        size: Feature.round(new Vector(180, 50), new Vector(150, 50)),
+        size: Feature.round(new Vector(180, 70), new Vector(150, 70)),
         textAlign: Feature.round("center", "left")
     });
 
@@ -1410,6 +1442,7 @@ function refreshVacuumDetailWindow(statusLabel, entity_id) {
         if (entity.attributes.hasOwnProperty("status")) { vacText = vacText + entity.attributes.status + "\n\n" }
         if (entity.attributes.hasOwnProperty("fan_speed")) { vacText = vacText + "Fan: " + entity.attributes.fan_speed + "\n" }
         if (entity.attributes.hasOwnProperty("battery_level")) { vacText = vacText + "Battery: " + entity.attributes.battery_level + "%\n" }
+        if (entity.attributes.hasOwnProperty("water_tank") && entity.attributes.water_tank == true) { vacText = vacText + "Water Tank 👍\n" }
         statusLabel.text(vacText)
     })
 
