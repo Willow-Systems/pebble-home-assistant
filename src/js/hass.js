@@ -197,6 +197,17 @@ function scene_activate(entity, cb) {
     makePostRequest(path, data, cb)
 }
 
+function process_intent(text, cb) {
+
+    console.log("[hass] Process intent: " )
+    var data = {
+        text: text
+    };
+    var path = "/conversation/process"
+
+    makePostRequest(path, data, cb)
+}
+
 function lock(entity, cb) {
 
     console.log("[hass] Lock device " + entity.entity_id)
@@ -311,6 +322,7 @@ module.exports.vacuum_start = vacuum_start
 module.exports.vacuum_pause = vacuum_pause
 module.exports.vacuum_return_to_base = vacuum_return_to_base
 module.exports.scene_activate = scene_activate
+module.exports.process_intent = process_intent
 module.exports.lock = lock
 module.exports.unlock = unlock
 module.exports.toggle_lock = cust_toggle_lock

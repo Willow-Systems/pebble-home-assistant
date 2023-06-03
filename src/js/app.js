@@ -7,6 +7,7 @@ var Feature = require('platform/feature');
 var Platform = require('platform');
 var hass = require('./hass.js');
 var Vibe = require('ui/vibe');
+var Voice = require('ui/voice');
 var version = "1.3"
 
 var emulator_hax = false;
@@ -27,6 +28,7 @@ var config = {
     showAutomations: Settings.data('ui_show_automations'),
     showMediaPlayers: Settings.data('ui_show_mediaplayers'),
     showScripts: Settings.data('ui_show_scripts'),
+    showAssist: Settings.data('ui_show_assist'),
     enableIcons: true,
     requestConfig: false
 }
@@ -51,6 +53,7 @@ function setSettingsToDefaultIfRequired(force) {
         Settings.data('ui_show_sensors', true);
         Settings.data('ui_show_automations', false);
         Settings.data('ui_show_scripts', true)
+        Settings.data('ui_show_assist', true)
         Settings.data('ui_show_scenes', true)
         Settings.data('hasChangedLightOperationsBefore', false)
         Settings.data('welcomeScreen', false)
@@ -68,6 +71,8 @@ function bringSettingsUpToDate() {
 
     //1.2:
     if (Settings.data('ui_show_scenes') == null) { Settings.data('ui_show_scenes', true) }
+    //1.3:
+    if (Settings.data('ui_show_assist') == null) { Settings.data('ui_show_assist', true) }
 }
 
 //Unused rn
@@ -177,6 +182,7 @@ function renderHomeMenu(hasConfig) {
         //If we're here, we have enough settings to start
         hass.init(Settings.option("url"), Settings.option("token"))
         
+        if (Settings.data('ui_show_assist')) { homeItems.push({ title: "Voice Assist" }) }
         if (config.showLights) { homeItems.push({ title: "Lights" }) }
         if (config.showSwitches) { homeItems.push({ title: "Switches" }) }
         if (config.showSensors) { homeItems.push({ title: "Sensors" }) }
@@ -201,6 +207,8 @@ function renderHomeMenu(hasConfig) {
                 hass.getStates(renderStatesMenu, "script");
             } else if (e.item.title.toLowerCase() == "scenes") {
                 hass.getStates(renderStatesMenu, "scene");
+            } else if (e.item.title.toLowerCase() == "voice assist") {
+                showAssistScreen()
             } else if (e.item.title.toLowerCase() == "about") {
                 showAboutScreen()
             }
@@ -255,6 +263,7 @@ function showFirstTimeRunScreen() {
     });
     ftrs.show()
 }
+
 function showAboutScreen() {
     var aboutScreen = new UI.Card({
         title: 'Home Assistant',
@@ -270,6 +279,43 @@ function showAboutScreen() {
     });
     aboutScreen.show()
 }
+
+function showAssistScreen() {
+    console.log('starting voice dictation');
+    Voice.dictate('start', false, function(dict) {
+        console.log(JSON.stringify(dict));
+        if (dict.failed) {
+            var errScreen = new UI.Card({
+                title: 'Assist',
+                subtitle: 'Error',
+                body: dict.err,
+                scrollable: true
+            })
+            errScreen.show();
+        } else {
+            var speech = dict.transcription;
+            var waitScreen = new UI.Card({
+                title: 'Sending...',
+                body: speech,
+                scrollable: true
+            });
+            waitScreen.show();
+            Voice.dictate('stop');
+            hass.process_intent(speech, function (data) {
+                var resp = data.response.speech.plain.speech;
+                console.log("Got response: " + resp);
+                var respScreen = new UI.Card({
+                    title: 'Assist',
+                    body: resp,
+                    scrollable: true
+                });
+                waitScreen.hide();
+                respScreen.show();
+            });
+        }
+    })
+}
+
 
 function validateSettings() {
     console.log("Validate settings")
