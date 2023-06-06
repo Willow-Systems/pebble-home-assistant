@@ -10,6 +10,8 @@ There are only two 'Home Assistant' apps on the [Rebble app store](https://apps.
 
 ## With this app you can:
 
+- Assistant:
+  - Send voice commands to the Home Assistant conversation endpoint
 - Lights:
   - View a list of all light entities
   - Toggle them quickly
