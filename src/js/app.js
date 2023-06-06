@@ -409,46 +409,6 @@ function addVoiceBubble(txt, side) {
     }
 
 }
-// function moveVoiceBubblesUp(distance) {
-//     console.log("MVBU")
-//     console.log(voice_bubbles.length)
-
-//     const char_bar_height = 45
-
-//     for (var i=voice_bubbles.length-1; i >= 0; i--) {
-//         console.log("i: " + i)
-//         var bubble = voice_bubbles[i];
-//         console.log(bubble)
-
-//         var move_distance = distance
-//         if (bubble.position().y > Feature.resolution().y) {
-//             console.log("-------------------------------------- Move Extra")
-//             move_distance += char_bar_height
-//         }
-
-//         console.log("MOVE " + move_distance)
-
-//         //I really want to use animate, but it's so janky
-//         // bubble.animate({
-//         //     position: new Vector(bubble.position().x, bubble.position().y - move_distance)
-//         // }).queue(function(next) {
-//         //     if (bubble.position().y <= 0) {
-//         //         console.log("Pop bubble")
-//         //         bubble.remove()
-//         //         // voice_bubbles.splice(i)
-//         //     }
-//         //     next();
-//         // })
-
-//         bubble.position(new Vector(bubble.position().x, bubble.position().y - move_distance))
-//         if (bubble.position().y < 0) {
-//                 console.log("Pop bubble")
-//                 bubble.remove()
-//                 voice_bubbles.splice(i)
-//         }
-        
-//     }
-// }
 function doAssistantVoice() {
     console.log('starting voice dictation');
     Voice.dictate('start', false, function(dict) {
