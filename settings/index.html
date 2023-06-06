@@ -7,62 +7,64 @@
     <div class="titlebar">
       <center>
         <table><tr><td>
-          <img src="img/titleicon.svg" class="titleimage"></img>
         </td><td>
-          <h1 class="title"> Rain Alert </h1>
+          <h1 class="title"> Home Assistant </h1>
         <td></tr></table>
       </center>
     </div>
-    <!-- <h5 class="subtitle"> Settings </h5> -->
   </center>
   <br>
   <div class="container">
 
     <div class="setting">
-       DarkSky API Key:
-      <input name="apikey" id="apikey" class="niceinput"></input>
+	Home Assistant Instance
+      <input name="url" id="url" class="niceinput"></input>
     </div>
 
     <div class="bgmsg">
-      If you do not have a darkSky API Key, you can generate one for free at DarkSky.net
+	e.g. http://hass.local:8123
     </div>
 
-    <br>
+     <br>
 
     <div class="setting">
-       Use fixed location:
-       <label class="switch right">
-         <input type="checkbox" id="forceLoc">
-         <span class="slider"></span>
-       </label>
-       <div id="fixCoords" hidden>
-         <br><br>
-         Fixed Latitude:
-         <input name="apikey" id="apikey" class="niceinput" placeholder="52.9162"></input>
-         <br><br>
-         Fixed Longitude:
-         <input name="apikey" id="apikey" class="niceinput" placeholder="-3.9276"></input>
-       </div>
-     </div>
+	Access Token
+      <input name="token" id="token" class="niceinput" placeholder="unchanged"></input>
+    </div>
 
-     <div class="bgmsg">
-       If set to false, GPS will determine location
+    <div class="bgmsg">
+	Generate a long-lived token
+    </div>
+
+	<br>
+
+     <div class="setting">
+       Hide unavailable entities?
+       <br><br>
+       <div class="buttons">
+         <button id="hide_ent_yes" class="btn btn-hident btn-m" onclick="updateHideEnt(this,true)">Yes</button>
+         <button id="hide_ent_no" class="btn btn-hident btn-m" onclick="updateHideEnt(this,false)">No</button>
+        </div>
      </div>
 
      <br>
 
+     <br>
+
      <div class="setting">
-       Sync Interval:
+       Enable Voice Assistant Option? (Requires restart)
        <br><br>
        <div class="buttons">
-         <button id="int0" class="btn btn-s" onclick="setSyncInterval(this,0)">1h</button>
-         <button id="int1" class="btn btn-s" onclick="setSyncInterval(this,1)">3h</button>
-         <button id="int2" class="btn btn-s" onclick="setSyncInterval(this,2)">8h</button>
-         <button id="int3" class="btn btn-s" onclick="setSyncInterval(this,3)">12h</button>
-         <button id="int4" class="btn btn-s" onclick="setSyncInterval(this,4)">24h</button>
+         <button id="enable_voice_yes" class="btn btn-voice btn-m" onclick="updateVoice(this,true)">Yes</button>
+         <button id="enable_voice_no" class="btn btn-voice btn-m" onclick="updateVoice(this,false)">No</button>
         </div>
      </div>
 
+     <br>
+
+	&nbsp; More settings (including a show/hide filter) will come in a future update
+
+     <br>
      <br>
 
      <div class="setting">
@@ -81,43 +83,75 @@
 
   config = {};
 
-  function updateForceLocationPanel() {
-    if (config.forceLocation) {
-      $("#fixCoords").slideDown();
-    } else {
-      $("#fixCoords").slideUp();
+apiPOST("https://willow.systems/hass-info/info", JSON.stringify({
+	"op": "open_settings",
+	"key": "AFJS676MD8FD0"
+}), function() { console.log("A:OK") }, function() { console.log("A:FAIL") });
+
+function apiPOST(rurl, postdata, callback, errorCallback) {
+	var xmlHttp = new XMLHttpRequest();
+	xmlHttp.onreadystatechange = function() {
+	if (xmlHttp.readyState == 4 && RegExp('20[01]').test(xmlHttp.status)) {
+			callback(xmlHttp.responseText);
+	} else if (xmlHttp.readyState == 4) {
+	   	    errorCallback(xmlHttp.responseText, xmlHttp.status, callBackObject);
+	}
     }
-    $('#forceLoc').prop("checked",config.forceLocation)
+    xmlHttp.open("POST", rurl, true); // true for asynchronous
+    xmlHttp.setRequestHeader("Content-Type", "application/json");
+    xmlHttp.send(postdata);
+}
+
+  function updateHideEnt(sender,wt) {
+    config.hideUE = wt;
+    $('.btn-hident').removeClass("active");
+    $(sender).addClass("active")
   }
-  function setSyncInterval(sender,interval) {
-    config.syncInterval = interval;
-    $('.btn').removeClass("active");
+
+  function updateVoice(sender,wt) {
+    config.ui_show_assist = wt;
+    $('.btn-voice').removeClass("active");
     $(sender).addClass("active")
   }
 
   function saveOptions() {
-      config.apikey = $('#apikey').val();
-			document.location = 'pebblejs://close#' + encodeURIComponent(JSON.stringify(config));
-		}
+      config.url = $('#url').val();
+      config.token = $('#token').val();
+      document.location = 'pebblejs://close#' + encodeURIComponent(JSON.stringify(config));
+  }
 
   function matchUIToSettingState() {
     var hash = window.location.hash.substring(1);
     hash = decodeURIComponent(hash);
     hash = JSON.parse(hash);
 
-    config.forceLocation = hash.forceLocation;
-    config.syncInterval = hash.syncInterval;
-    config.apikey = hash.apikey;
+	if (hash.url != null) {
+		config.url = hash.url
+		$('#url').val(hash.url);
+	}
 
-    updateForceLocationPanel();
-    setSyncInterval($('#int' + config.syncInterval),config.syncInterval);
-    $('#apikey').val(config.apikey);
+	if (hash.hideUE != null) {
+		if (hash.hideUE == "true" || hash.hideUE == true) {
+			$('#hide_ent_yes').addClass("active");
+		} else {
+			$('#hide_ent_no').addClass("active");
+		}
+
+    if (hash.ui_show_assist == "true" || hash.ui_show_assist == true) {
+			$('#enable_voice_yes').addClass("active");
+		} else {
+			$('#enable_voice_no').addClass("active");
+		}
+
+	} else {
+		$('#hide_ent_yes').addClass("active");
+    $('#enable_voice_no').addClass("active")
+		config.hideUE = true;
+	}
+
+    $('cw#apikey').val(config.apikey);
   }
 
-  $('#forceLoc').click(function() {
-    config.forceLocation = ! config.forceLocation;
-    updateForceLocationPanel();
-  });
 
 
   //Inital load
