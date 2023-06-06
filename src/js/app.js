@@ -366,42 +366,6 @@ function addVoiceBubble(txt, side) {
         return
     }
 
-
-    // var chars_per_line = 10
-    // // if (side == "right") { chars_per_line = 5 }
-    // const bubble_lines = Math.ceil(txt.length / chars_per_line)
-    // const bubble_height = bubble_lines * 15
-
-    // console.log("Text L: " + txt.length)
-    // console.log("Lines : " + bubble_lines)
-    // console.log("Height: " + bubble_height)
-
-    // const max_y = 169
-    // const x_left = 2
-    // const x_right = 144/2 + 2
-
-    // var pos_left = x_left
-    // var font = "gothic-14"
-    // if (side == "right") { 
-    //     pos_left = x_right
-    //     font = "gothic-14-bold"
-    // }
-
-    // var bubble = new UI.Text({
-    //     text: txt,
-    //     color: Feature.color(colour.highlight, "black"),
-    //     position: new Vector(pos_left, max_y),
-    //     size: new Vector(144/2 - 4, bubble_height),
-    //     textAlign: "left",
-    //     font: font,
-    //     // backgroundColor: "black"
-    // })
-
-    // wind_conversation.add(bubble)
-
-    // voice_bubbles.push(bubble)
-    // moveVoiceBubblesUp(bubble_height)
-
     if (side == "out") {
         voice_bubbles.out.text(txt)
     } else {
