@@ -223,8 +223,8 @@
     "diorite"
   ],
   "uuid": "e72aed38-ceda-412b-bb20-3f606494cd1a",
-  "versionCode": 1.3,
-  "versionLabel": "1.3",
+  "versionCode": 1.4,
+  "versionLabel": "1.4",
   "watchapp": {
     "watchface": false
   }

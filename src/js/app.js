@@ -8,7 +8,7 @@ var Platform = require('platform');
 var hass = require('./hass.js');
 var Vibe = require('ui/vibe');
 var Voice = require('ui/voice');
-var version = "1.3"
+var version = "1.4"
 
 var emulator_hax = false;
 var always_reset_settings_hax = false;
