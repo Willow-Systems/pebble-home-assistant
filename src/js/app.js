@@ -67,12 +67,12 @@ function setSettingsToDefaultIfRequired(force) {
     }
 }
 function bringSettingsUpToDate() {
-    //If we add a new setting in an update, set it to it's default here
+    //If we add a new setting in an update, set it to its default here
 
     //1.2:
     if (Settings.data('ui_show_scenes') == null) { Settings.data('ui_show_scenes', true) }
     //1.3:
-    if (Settings.data('ui_show_assist') == null) { Settings.data('ui_show_assist', true) }
+    if (Settings.option('ui_show_assist') == null) { Settings.option('ui_show_assist', true) }
 }
 
 //Unused rn
@@ -116,6 +116,12 @@ homeMenu = new UI.Menu({
 wind_sensorDetail = null;
 menuPosToEntity = [];
 itemIndex = 0;
+
+wind_conversation = null;
+voice_bubbles = {
+    out: null,
+    in: null
+}
 
 //Global light details page variables
 brightnessMenuActiveItem = 0;
@@ -169,6 +175,7 @@ function go() {
         }
 
     }
+
 }
 
 function renderHomeMenu(hasConfig) {
@@ -180,13 +187,15 @@ function renderHomeMenu(hasConfig) {
 
     if (hasConfig) {
         //If we're here, we have enough settings to start
-        hass.init(Settings.option("url"), Settings.option("token"))
         
-        if (Settings.data('ui_show_assist')) { homeItems.push({ title: "Voice Assist" }) }
+        if (! emulator_hax) {
+            hass.init(Settings.option("url"), Settings.option("token"))
+        }
+
+        if (Settings.option('ui_show_assist') == true) { homeItems.push({ title: "Assistant" }) }
         if (config.showLights) { homeItems.push({ title: "Lights" }) }
         if (config.showSwitches) { homeItems.push({ title: "Switches" }) }
         if (config.showSensors) { homeItems.push({ title: "Sensors" }) }
-        // if (config.showMediaPlayers) { homeItems.push({ title: "Media Players" }) }
         if (config.showAutomations) { homeItems.push({ title: "Automations" }) }
         if (config.showScripts) {homeItems.push({ title: "Scripts" }) }
         if (Settings.data('ui_show_scenes')) { homeItems.push({ title: "Scenes" }) }
@@ -207,8 +216,8 @@ function renderHomeMenu(hasConfig) {
                 hass.getStates(renderStatesMenu, "script");
             } else if (e.item.title.toLowerCase() == "scenes") {
                 hass.getStates(renderStatesMenu, "scene");
-            } else if (e.item.title.toLowerCase() == "voice assist") {
-                showAssistScreen()
+            } else if (e.item.title.toLowerCase() == "assistant") {
+                showAssistScreen(true)
             } else if (e.item.title.toLowerCase() == "about") {
                 showAboutScreen()
             }
@@ -280,41 +289,198 @@ function showAboutScreen() {
     aboutScreen.show()
 }
 
-function showAssistScreen() {
+
+function showAssistScreen(voice_now) {
+
+    wind_conversation = new UI.Window({
+        status: false,
+        scrollable: true,
+        height: 600,
+        backgroundColor: colour.highlight
+    }) 
+
+    wind_conversation.on('click', function(e) {
+        doAssistantVoice()
+    })
+
+    const bg_img = new UI.Image({
+        size: new Vector(Feature.resolution().x, Feature.resolution().y),
+        position: new Vector(0, 0),
+        image: "IMAGE_BG_SPEECH",
+        compositing: "set",
+        backgroundColor: "transparent",
+    })
+    wind_conversation.add(bg_img)
+
+    voice_bubbles.in = new UI.Text({
+        text: " ",
+        color: 'black',
+        font: "gothic-14-bold",
+        position: Feature.round(new Vector(30, 18), new Vector(13, 13)),
+        size: new Vector(105, 40),
+        textAlign: "center",
+        textOverflow: "ellipsis"
+    })
+    wind_conversation.add(voice_bubbles.in)
+
+    voice_bubbles.out = new UI.Text({
+        text: " ",
+        color: 'black',
+        font: "gothic-14-bold",
+        position: Feature.round(new Vector(36, 98), new Vector(15, 93)),
+        size: new Vector(115, 40),
+        textAlign: "center",
+        textOverflow: "ellipsis"
+    })
+    wind_conversation.add(voice_bubbles.out)
+
+    wind_conversation.show()
+
+    // Uncomment for testing
+    // setTimeout(function() {
+    //     console.log("Add Test Bubble Left")
+    //     addVoiceBubble("This is a test", "in")
+    //     setTimeout(function() {
+    //         console.log("Add Response Bubble Right")
+    //         addVoiceBubble("This is a response", "out")
+    //         setTimeout(function() {
+    //             console.log("Add Response Bubble Left")
+    //             addVoiceBubble("Third message. This one is a little bit longer isn't it", "in")
+    //             setTimeout(function() {
+    //                 console.log("Add Response Bubble Right")
+    //                 addVoiceBubble("Final Response", "out")
+    //             }, 2000)
+    //         }, 2000)
+    //     }, 1000)
+    // }, 1000)
+
+    // return
+    
+    if (voice_now == true) {
+        doAssistantVoice()
+    }
+}
+function addVoiceBubble(txt, side) {
+    if (wind_conversation == null) {
+        //Voice conversation window not yet created. How did you get here?
+        return
+    }
+
+
+    // var chars_per_line = 10
+    // // if (side == "right") { chars_per_line = 5 }
+    // const bubble_lines = Math.ceil(txt.length / chars_per_line)
+    // const bubble_height = bubble_lines * 15
+
+    // console.log("Text L: " + txt.length)
+    // console.log("Lines : " + bubble_lines)
+    // console.log("Height: " + bubble_height)
+
+    // const max_y = 169
+    // const x_left = 2
+    // const x_right = 144/2 + 2
+
+    // var pos_left = x_left
+    // var font = "gothic-14"
+    // if (side == "right") { 
+    //     pos_left = x_right
+    //     font = "gothic-14-bold"
+    // }
+
+    // var bubble = new UI.Text({
+    //     text: txt,
+    //     color: Feature.color(colour.highlight, "black"),
+    //     position: new Vector(pos_left, max_y),
+    //     size: new Vector(144/2 - 4, bubble_height),
+    //     textAlign: "left",
+    //     font: font,
+    //     // backgroundColor: "black"
+    // })
+
+    // wind_conversation.add(bubble)
+
+    // voice_bubbles.push(bubble)
+    // moveVoiceBubblesUp(bubble_height)
+
+    if (side == "out") {
+        voice_bubbles.out.text(txt)
+    } else {
+        voice_bubbles.in.text(txt)
+    }
+
+}
+// function moveVoiceBubblesUp(distance) {
+//     console.log("MVBU")
+//     console.log(voice_bubbles.length)
+
+//     const char_bar_height = 45
+
+//     for (var i=voice_bubbles.length-1; i >= 0; i--) {
+//         console.log("i: " + i)
+//         var bubble = voice_bubbles[i];
+//         console.log(bubble)
+
+//         var move_distance = distance
+//         if (bubble.position().y > Feature.resolution().y) {
+//             console.log("-------------------------------------- Move Extra")
+//             move_distance += char_bar_height
+//         }
+
+//         console.log("MOVE " + move_distance)
+
+//         //I really want to use animate, but it's so janky
+//         // bubble.animate({
+//         //     position: new Vector(bubble.position().x, bubble.position().y - move_distance)
+//         // }).queue(function(next) {
+//         //     if (bubble.position().y <= 0) {
+//         //         console.log("Pop bubble")
+//         //         bubble.remove()
+//         //         // voice_bubbles.splice(i)
+//         //     }
+//         //     next();
+//         // })
+
+//         bubble.position(new Vector(bubble.position().x, bubble.position().y - move_distance))
+//         if (bubble.position().y < 0) {
+//                 console.log("Pop bubble")
+//                 bubble.remove()
+//                 voice_bubbles.splice(i)
+//         }
+        
+//     }
+// }
+function doAssistantVoice() {
     console.log('starting voice dictation');
     Voice.dictate('start', false, function(dict) {
-        console.log(JSON.stringify(dict));
         if (dict.failed) {
             var errScreen = new UI.Card({
-                title: 'Assist',
-                subtitle: 'Error',
+                title: 'Oops',
+                subtitle: "Assistant Error",
                 body: dict.err,
                 scrollable: true
             })
-            errScreen.show();
+            
+            if (dict.err == "systemAborted") {
+                wind_conversation.hide()
+            } else {
+                errScreen.show();
+            }
         } else {
             var speech = dict.transcription;
-            var waitScreen = new UI.Card({
-                title: 'Sending...',
-                body: speech,
-                scrollable: true
-            });
-            waitScreen.show();
+            addVoiceBubble(speech, "in")
+            addVoiceBubble("°°°", "out")
             Voice.dictate('stop');
-            hass.process_intent(speech, function (data) {
+            hass.process_voice_intent(speech, function (data) {
                 var resp = data.response.speech.plain.speech;
-                console.log("Got response: " + resp);
-                var respScreen = new UI.Card({
-                    title: 'Assist',
-                    body: resp,
-                    scrollable: true
-                });
-                waitScreen.hide();
-                respScreen.show();
+                console.log("Got response: " + JSON.stringify(data));
+                addVoiceBubble(resp, "out")
             });
         }
     })
 }
+
+
+
 
 
 function validateSettings() {
